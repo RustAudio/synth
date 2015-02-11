@@ -1,4 +1,4 @@
-# synth [![Build Status](https://travis-ci.org/RustAudio/envelope.svg?branch=master)](https://travis-ci.org/RustAudio/envelope)
+# synth [![Build Status](https://travis-ci.org/RustAudio/synth.svg?branch=master)](https://travis-ci.org/RustAudio/synth)
 
 A polyphonic Synth type whose multiple oscillators generate sound via amplitude and frequency envelopes.
 
@@ -25,5 +25,6 @@ for event in stream.by_ref() {
 See an example [here](https://github.com/RustAudio/synth/blob/master/examples/test.rs).
 
 PortAudio
+---------
 
-At the moment you need to have [PortAudio](http://www.portaudio.com/download.html) installed on your system. I'm currently trying to switch over to [CPAL (the purely rust audio lib)](https://github.com/tomaka/cpal) which would remove this dependency.
+At the moment you need to have [PortAudio](http://www.portaudio.com/download.html) installed on your system. We're currently trying to switch over to [CPAL (the purely rust audio lib)](https://github.com/tomaka/cpal) which would remove this dependency.
