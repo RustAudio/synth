@@ -1,0 +1,27 @@
+[package]
+
+name = "synth"
+version = "0.0.1"
+authors = ["mitchmindtree <mitchell.nordine@gmail.com>"]
+
+[dependencies.dsp-chain]
+git = "https://github.com/RustAudio/dsp-chain.git"
+
+[dependencies.pitch_calc]
+git = "https://github.com/RustAudio/pitch_calc.git"
+
+[dependencies.time_calc]
+git = "https://github.com/RustAudio/time_calc.git"
+
+[dependencies.envelope]
+git = "https://github.com/RustAudio/envelope.git"
+
+[dependencies.gaussian]
+git = "https://github.com/mitchmindtree/gaussian.git"
+
+[dependencies.utils]
+git = "https://github.com/mitchmindtree/utils-rs.git"
+
+[dependencies]
+rand = "0.1.2"
+rustc-serialize = "0.2.12"
