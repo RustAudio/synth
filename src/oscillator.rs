@@ -66,9 +66,9 @@ impl Oscillator {
     #[inline]
     pub fn amp_at_ratio(&mut self, ratio: f64, note_freq_multi: f64, sample_hz: f64) -> f32 {
         let phase = self.phase;
-        // Determine the overall frequency and in turn how much to advance the phase.
         let freq_at_ratio = self.freq_at_ratio(ratio) * note_freq_multi;
-        self.phase = self.waveform.next_phase(phase, freq_at_ratio, sample_hz);
+        // Determine the next phase with respect to frequency and sample rate.
+        self.phase = phase + (freq_at_ratio / sample_hz);
         self.waveform.amp_at_phase(phase) * self.amplitude.y(ratio) as f32
     }
 
