@@ -71,8 +71,7 @@ fn main() {
             .loop_points(0.49, 0.51) // Loop start and end points.
             .fade(500.0, 500.0) // Attack and release.
             .num_voices(16) // By default Synth is monophonic but this gives it `n` voice polyphony.
-
-        // Other methods include...
+        // Other methods include:
             // .loop_start(0.0)
             // .loop_end(1.0)
             // .attack(ms)

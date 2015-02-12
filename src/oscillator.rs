@@ -2,7 +2,7 @@
 //! Synthesis Oscillator module.
 
 use env_point::Point;
-use pitch::{MAX_HZ, MIN_HZ};
+use pitch;
 use envelope::Envelope;
 use waveform::Waveform;
 
@@ -77,14 +77,21 @@ impl Oscillator {
     #[inline]
     pub fn freq_at_ratio(&self, ratio: f64) -> f64 {
         use gaussian;
-        let freq = self.frequency.y(ratio);
-        let hz = match self.gaussian_perc > 0.0 {
-            true => gaussian::gen(0.5f64, self.gaussian_perc)
-                    * (freq / 0.5)
-                    * (MAX_HZ as f64 - MIN_HZ as f64)
-                    + MIN_HZ as f64,
-            false => freq * ((MAX_HZ - MIN_HZ) + MIN_HZ) as f64
-        };
+        let mut freq = self.frequency.y(ratio);
+        if self.waveform == Waveform::NoiseWalk {
+            freq = pitch::ScaledPerc(freq, 0.6).perc()
+        }
+        let hz = if self.gaussian_perc > 0.0 {
+            use std::num::Float;
+            let mels = pitch::Perc(freq).mel();
+            let gaus_mels = mels
+                          + gaussian::gen(0.5f32, self.gaussian_perc.powf(2.0))
+                          * 1000.0
+                          - 500.0;
+            pitch::Mel(gaus_mels).hz()
+        } else {
+            pitch::Perc(freq).hz()
+        } as f64;
         hz
     }
 

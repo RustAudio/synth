@@ -1,7 +1,7 @@
 
 /// An Oscillator must use one of a variety
 /// of waveform types.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub enum Waveform {
     /// Sine Wave
     Sine,
