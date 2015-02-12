@@ -12,6 +12,7 @@ use dsp::Settings as DspSettings;
 use dsp::{AudioBuffer, DspBuffer};
 use oscillator::Oscillator;
 use pitch;
+use std::iter::repeat;
 use time::{self, Ms};
 use voice::{Voice, NoteDuration};
 
@@ -44,6 +45,8 @@ pub struct Synth {
     pub loop_data: Option<(LoopStart, LoopEnd)>,
     /// Data used for fading in / out from playback.
     pub fade_data: Option<(Attack, Release)>,
+    /// Is the playback currently paused?
+    pub is_paused: bool,
 }
 
 const MS_300: Duration = 300.0;
@@ -51,17 +54,138 @@ const C_1: BasePitch = 32.703;
 
 impl Synth {
 
-    /// Constructor for Synth instrument.
-    pub fn new(oscillators: Vec<Oscillator>,
-               num_voices: usize,
-               base_pitch: BasePitch,
-               duration: Duration,
-               vol: f32,
-               normaliser: f32,
-               loop_data: Option<(LoopStart, LoopEnd)>,
-               fade_data: Option<(Attack, Release)>) -> Synth {
-        let voices = (0..num_voices).map(|_| Voice::new(oscillators.clone())).collect();
-        Synth::from_voices(voices, base_pitch, duration, vol, normaliser, loop_data, fade_data)
+    /// Constructor for a new Synth.
+    #[inline]
+    pub fn new() -> Synth {
+        Synth {
+            voices: vec!(),
+            duration: MS_300,
+            base_pitch: C_1,
+            vol: 1.0,
+            normaliser: 1.0,
+            loop_data: None,
+            fade_data: None,
+            is_paused: false,
+        }
+    }
+
+    /// Set the number of voices that the Synth shall use.
+    /// If there are no voices, a default voice will be constructed.
+    #[inline]
+    pub fn num_voices(self, num_voices: usize) -> Synth {
+        let len = self.voices.len();
+        if num_voices == len { return self }
+        let voices = if len == 0 {
+            repeat(Voice::new(vec!())).take(num_voices).collect()
+        } else if len < num_voices {
+            let last_voice = self.voices[len-1].clone();
+            self.voices.into_iter().chain(repeat(last_voice).take(num_voices - len)).collect()
+        } else {
+            self.voices.into_iter().take(num_voices).collect()
+        };
+        Synth { voices: voices, ..self }
+    }
+
+    /// Add an oscillator to a Synth.
+    #[inline]
+    pub fn oscillator(mut self, oscillator: Oscillator) -> Synth {
+        if self.voices.len() == 0 {
+            self.voices.push(Voice::new(vec!(oscillator)))
+        } else {
+            for voice in &mut self.voices {
+                voice.oscillators.push(oscillator.clone());
+            }
+        }
+        self
+    }
+
+    /// Add multiple oscillators to a Synth.
+    #[inline]
+    pub fn oscillators(mut self, oscillators: &[Oscillator]) -> Synth {
+        let new_oscillators = || oscillators.iter().map(|o| o.clone());
+        if self.voices.len() == 0 {
+            self.voices.push(Voice::new(new_oscillators().collect()))
+        }
+        for voice in &mut self.voices {
+            voice.oscillators.extend(new_oscillators())
+        }
+        self
+    }
+
+    /// Set the Synth's duration.
+    #[inline]
+    pub fn duration(self, duration: Duration) -> Synth {
+        Synth { duration: duration, ..self }
+    }
+
+    /// Set the Synth's base pitch.
+    #[inline]
+    pub fn base_pitch(self, base_pitch: BasePitch) -> Synth {
+        Synth { base_pitch: base_pitch, ..self }
+    }
+
+    /// Set the Synth's volume.
+    #[inline]
+    pub fn volume(self, vol: f32) -> Synth {
+        Synth { vol: vol, ..self }
+    }
+
+    /// Set the Synth's normaliser.
+    #[inline]
+    pub fn normaliser(self, normaliser: f32) -> Synth {
+        Synth { normaliser: normaliser, ..self }
+    }
+
+    /// Set the loop data for the synth.
+    #[inline]
+    pub fn loop_points(self, start: LoopStart, end: LoopEnd) -> Synth {
+        Synth { loop_data: Some((start, end)), ..self }
+    }
+
+    /// Set the fade data for the synth.
+    #[inline]
+    pub fn fade(self, attack: Attack, release: Release) -> Synth {
+        Synth { fade_data: Some((attack, release)), ..self }
+    }
+
+    /// Set the start loop point.
+    #[inline]
+    pub fn loop_start(self, start: LoopStart) -> Synth {
+        let loop_data = match self.loop_data {
+            Some((_, end)) => Some((start, end)),
+            None => Some((start, 1.0))
+        };
+        Synth { loop_data: loop_data, ..self }
+    }
+
+    /// Set the end loop point.
+    #[inline]
+    pub fn loop_end(self, end: LoopEnd) -> Synth {
+        let loop_data = match self.loop_data {
+            Some((start, _)) => Some((start, end)),
+            None => Some((0.0, end))
+        };
+        Synth { loop_data: loop_data, ..self }
+    }
+
+    /// Set the attack.
+    #[inline]
+    pub fn attack(self, attack: Attack) -> Synth {
+        let fade_data = match self.fade_data {
+            Some((_, release)) => Some((attack, release)),
+            None => Some((attack, 0.0))
+        };
+        Synth { fade_data: fade_data, ..self }
+    }
+
+    /// Set the release.
+    #[inline]
+    pub fn release(self, release: Release) -> Synth {
+        let fade_data = match self.fade_data {
+            Some((attack, _)) => Some((attack, release)),
+            None => Some((0.0, release))
+        };
+        Synth { fade_data: fade_data, ..self }
     }
 
     /// Construct a Synth from it's Voices rather than Oscillators and a number of voices.
@@ -80,19 +204,8 @@ impl Synth {
             normaliser: normaliser,
             loop_data: loop_data,
             fade_data: fade_data,
+            is_paused: false,
         }
-    }
-
-    /// Default constructor for a Synth instrument.
-    pub fn default() -> Synth {
-        let voices = vec![ Voice::default() ];
-        Synth::from_voices(voices, C_1, MS_300, 1.0, 1.0, None, None)
-    }
-
-    /// Constructor for quick and easy testing of Synth Instrument.
-    pub fn test_demo() -> Synth {
-        let voices = vec![ Voice::test_demo() ];
-        Synth::from_voices(voices, C_1, MS_300, 1.0, 1.0, None, None)
     }
 
     /// Add a default oscillator.
@@ -118,12 +231,14 @@ impl Synth {
     /// Return whether or not there are any currently active voices.
     #[inline]
     pub fn is_active(&self) -> bool {
+        if self.is_paused { return false }
         self.voices.iter().any(|voice| voice.maybe_note.is_some())
     }
 
     /// Trigger playback with an optional given note.
     #[inline]
     pub fn play_note(&mut self, maybe_note: (NoteDuration, NoteHz)) {
+        self.unpause();
         let (duration, hz) = maybe_note;
         let note_freq_multi = hz as f64 / self.base_pitch as f64;
         let mut oldest: Option<&mut Voice> = None;
@@ -140,6 +255,28 @@ impl Synth {
         }
         if let Some(voice) = oldest {
             voice.play_note((duration, note_freq_multi))
+        }
+    }
+
+    /// Pause playback.
+    #[inline]
+    pub fn pause(&mut self) {
+        self.is_paused = true;
+    }
+
+    /// Unpause playback.
+    #[inline]
+    pub fn unpause(&mut self ) {
+        self.is_paused = false;
+    }
+
+    /// Stop playback and clear the current notes.
+    #[inline]
+    pub fn stop(&mut self) {
+        for voice in self.voices.iter_mut() {
+            voice.maybe_note = None;
+            voice.playhead = 0;
+            voice.loop_playhead = 0;
         }
     }
 
@@ -201,161 +338,4 @@ impl<B> DspNode<B> for Synth where B: DspBuffer {
     }
 
 }
-
-    // fn audio_requested(&mut self, output: &mut B, settings: DspSettings) {
-    //     let (frames, channels) = (settings.frames as usize, settings.channels as usize);
-    //     let Synth {
-    //         ref mut voices,
-    //         loop_data: (loop_start, loop_end, ref mut loop_playhead),
-    //         attack,
-    //         release,
-    //         ref mut playhead,
-    //         ref mut is_playing,
-    //         duration,
-    //         note_duration,
-    //         note_freq_multi,
-    //         normaliser,
-    //         vol,
-    //     } = *self;
-    //     let duration = Ms(duration).samples(settings.sample_hz);
-
-    //     let mut value: f32;
-
-    //     for i in range(0, frames) {
-
-    //         if *is_playing && loop_playhead < duration {
-    //             // Sum the amplitude of each oscillator at the given ratio.
-    //             let ratio = loop_playhead as f64 / duration as f64;
-    //             value = voices.iter_mut().fold(0.0, |total, voice| {
-    //                 let note = voice.note;
-    //                 if let Some(note_duration, note_hz) = note {
-    //                     total + voice.oscillators.iter_mut().fold(0.0, |total, oscillator| {
-    //                         total + oscillator.amp_at_ratio(ratio, note_freq_multi, settings.sample_hz)
-    //                     })
-    //                 } else {
-    //                     total
-    //                 }
-    //             }) * normaliser * vol;
-    //         } else {
-    //             // If not playing, just assign the value as 0.
-    //             value = 0.0;
-    //         }
-
-    //         // Assign the value to each channel.
-    //         for j in range(0, channels) {
-    //             output[i * channels + j] = value;
-    //         }
-
-    //         // Iterate the loop_playhead. If the loop_playhead passes the loop_end,
-    //         // reset the playhead to the start.
-    //         *loop_playhead += 1;
-    //         if *loop_playhead >= loop_end {
-    //             *loop_playhead = (*loop_playhead - loop_end) + loop_start;
-    //         }
-
-    //         // Iterate the playhead. If the playhead passes the duration of the instrument or
-    //         // the note that is currently being played, reset the playhead and stop playback.
-    //         *playhead += 1;
-    //         if *playhead >= note_duration + release ||
-    //         *loop_playhead > duration {
-    //             *is_playing = false;
-    //             *playhead = 0;
-    //         }
-
-    //     }
-
-    // }
-
-// impl_pitch!(Synth, inst_data.base_pitch)
-
-// impl Instrument for Synth {
-// 
-//     /// Get a reference to the Data struct.
-//     fn get_instrument_data<'a>(&'a self) -> &'a Data { &self.inst_data }
-// 
-//     /// Get a mutable reference to the Data struct.
-//     fn get_instrument_data_mut<'a>(&'a mut self) -> &'a mut Data { &mut self.inst_data }
-// 
-//     /// Set normaliser.
-//     fn set_normaliser(&mut self, normaliser: f32) {
-//         for voice in self.voices.iter_mut() {
-//             for oscillator in voice.oscillators.iter_mut() {
-//                 oscillator.normaliser = normaliser;
-//             }
-//         }
-//         self.inst_data.analysis.normaliser = normaliser;
-//     }
-// 
-//     /// Set the automixer for the instrument.
-//     fn set_auto_mixer(&mut self, auto_mixer: f32) {
-//         for voice in self.voices.iter_mut() {
-//             for oscillator in voice.oscillators.iter_mut() {
-//                 oscillator.auto_mixer = auto_mixer;
-//             }
-//         }
-//         self.inst_data.auto_mixer = auto_mixer;
-//     }
-// 
-// }
-// 
-// 
-// impl Fadable for Synth {
-//     impl_fadable_get_data!(inst_data.fade_data)
-//     /// Return a vector of mutable references to all `Fadable` children.
-//     fn get_fadable_children<'a>(&'a mut self) -> Vec<&'a mut Fadable> {
-//         let num_children = self.voices.iter().fold(0u, |a, ref b| a + b.oscillators.len());
-//         self.voices.iter_mut().fold(Vec::with_capacity(num_children), |mut vec: Vec<&'a mut Fadable + 'a>, voice| {
-//             let temp: Vec<&mut Fadable> = voice.oscillators.iter_mut().map(|osc| osc as &mut Fadable).collect();
-//             vec.extend(temp.into_iter()); vec
-//         })
-//     }
-// }
-// 
-// impl Loopable for Synth {
-//     impl_loopable_get_data!(inst_data.loop_data)
-//     /// Return a vector of mutable references to all `Loopable` children.
-//     fn get_loopable_children<'a>(&'a mut self) -> Vec<&'a mut Loopable> {
-//         let num_children = self.voices.iter().fold(0u, |a, ref b| a + b.oscillators.len());
-//         self.voices.iter_mut().fold(Vec::with_capacity(num_children), |mut vec: Vec<&'a mut Loopable + 'a>, voice| {
-//             let temp: Vec<&mut Loopable> = voice.oscillators.iter_mut().map(|osc| osc as &mut Loopable).collect();
-//             vec.extend(temp.into_iter()); vec
-//         })
-//     }
-// }
-// 
-// impl Playable for Synth {
-// 
-//     impl_playable_get_children!(voices)
-// 
-//     /// Start the playback of the Instrument type.
-//     fn play(&mut self, note: Option<&Note>) {
-//         let mut oldest: Option<&mut Voice> = None;
-//         let mut max_sample_count: i64 = 0;
-//         let hz = self.hz();
-//         self.set_note_freq_multi(note.map_or(1.0, |n| n.hz() / hz));
-//         for voice in self.voices.iter_mut() {
-//             if !voice.is_playing() {
-//                 voice.play(note);
-//                 return;
-//             }
-//             if voice.oscillators[0].playhead >= max_sample_count {
-//                 max_sample_count = voice.oscillators[0].playhead;
-//                 oldest = Some(voice);
-//             }
-//         }
-//         match oldest { Some(voice) => voice.play(note), None => () }
-//     }
-// 
-//     /// Return whether or not the Synth is currently playing.
-//     fn is_playing(&self) -> bool {
-//         for voice in self.voices.iter() {
-//             if voice.is_playing() {
-//                 return true;
-//             }
-//         }
-//         false
-//     }
-// 
-// }
-// 
 
