@@ -16,7 +16,7 @@ git = "https://github.com/RustAudio/time_calc.git"
 [dependencies.envelope]
 git = "https://github.com/RustAudio/envelope.git"
 
-[dependencies.gaussian]
+[dependencies.simple_gaussian]
 git = "https://github.com/mitchmindtree/gaussian.git"
 
 [dependencies.utils]
