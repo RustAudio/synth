@@ -1,27 +1,25 @@
 [package]
 
 name = "synth"
-version = "0.0.1"
+description = "A polyphonic Synth type whose multiple oscillators generate sound via amplitude and frequency envelopes."
+version = "0.0.2"
 authors = ["mitchmindtree <mitchell.nordine@gmail.com>"]
+readme = "README.md"
+keywords = ["synthesis", "dsp", "audio", "music", "instrument"]
+license = "MIT"
+repository = "https://github.com/RustAudio/synth.git"
+homepage = "https://github.com/RustAudio/synth"
+
 
 [dependencies.dsp-chain]
 git = "https://github.com/RustAudio/dsp-chain.git"
 
-[dependencies.pitch_calc]
-git = "https://github.com/RustAudio/pitch_calc.git"
-
-[dependencies.time_calc]
-git = "https://github.com/RustAudio/time_calc.git"
-
-[dependencies.envelope]
-git = "https://github.com/RustAudio/envelope.git"
-
-[dependencies.gaussian]
-git = "https://github.com/mitchmindtree/gaussian.git"
-
-[dependencies.utils]
-git = "https://github.com/mitchmindtree/utils-rs.git"
-
 [dependencies]
+envelope = "*"
+mindtree_utils = "*"
+pitch_calc = "*"
 rand = "0.1.2"
 rustc-serialize = "0.2.12"
+simple_gaussian = "*"
+time_calc = "*"
+
