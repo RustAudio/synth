@@ -36,7 +36,7 @@ fn main() {
         use envelope::{Envelope, Point};
         use synth::{Oscillator, Synth, Waveform};
 
-        // The following envelopes should create a downward pitching saw wave that gradually quietens.
+        // The following envelopes should create a downward pitching sine wave that gradually quietens.
         // Try messing around with the points and adding some of your own!
         let amp_env = Envelope::from_points(vec!(
             //         Time ,  Amp ,  Curve
@@ -50,7 +50,7 @@ fn main() {
             //         Time    , Freq   , Curve
             Point::new(0.0     , 0.0    , 0.0),
             Point::new(0.00136 , 1.0    , 0.0),
-            Point::new(0.015   , 0.01   , 0.0),
+            Point::new(0.015   , 0.02   , 0.0),
             Point::new(0.045   , 0.005  , 0.0),
             Point::new(0.1     , 0.0022 , 0.0),
             Point::new(0.35    , 0.0011 , 0.0),
@@ -59,15 +59,15 @@ fn main() {
 
         // Now we can create our oscillator from our envelopes.
         let oscillator = Oscillator::new()
-            .waveform(Waveform::Saw) // There are also Sine, Noise, NoiseWalk and Square waveforms.
+            .waveform(Waveform::Sine) // There are also Saw, Noise, NoiseWalk and Square waveforms.
             .amplitude(amp_env)
             .frequency(freq_env);
 
         // Here we construct our Synth from our oscillator.
         Synth::new()
             .oscillator(oscillator) // Add as many different oscillators as desired.
-            .duration(2000.0) // Milliseconds.
-            .base_pitch(100.0) // Hz.
+            .duration(4000.0) // Milliseconds.
+            .base_pitch(LetterOctave(Letter::C, 1).hz()) // Hz.
             .loop_points(0.49, 0.51) // Loop start and end points.
             .fade(500.0, 500.0) // Attack and release.
             .num_voices(16) // By default Synth is monophonic but this gives it `n` voice polyphony.
@@ -84,7 +84,7 @@ fn main() {
     // Construct a note for the synth to perform. Have a play around with the pitch and duration!
     synth.play_note((
         Ms(2000.0).samples(SETTINGS.sample_hz as f64), // Note duration in samples.
-        LetterOctave(Letter::C, 4).hz() // Note pitch in hz.
+        LetterOctave(Letter::C, 1).hz() // Note pitch in hz.
     ));
 
     // We'll use this to count down from three seconds and then break from the loop.
