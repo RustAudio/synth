@@ -27,4 +27,10 @@ See an example [here](https://github.com/RustAudio/synth/blob/master/examples/te
 PortAudio
 ---------
 
-At the moment you need to have [PortAudio](http://www.portaudio.com/download.html) installed on your system. We're currently trying to switch over to [CPAL (the purely rust audio lib)](https://github.com/tomaka/cpal) which would remove this dependency.
+synth uses [PortAudio](http://www.portaudio.com) as a cross-platform audio backend. The [rust-portaudio](https://github.com/jeremyletang/rust-portaudio) dependency will first try to find an already installed version on your system before trying to download it and build PortAudio itself.
+
+License
+-------
+
+MIT - Same license as [PortAudio](http://www.portaudio.com/license.html).
+
