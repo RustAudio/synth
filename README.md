@@ -27,4 +27,4 @@ See an example [here](https://github.com/RustAudio/synth/blob/master/examples/te
 PortAudio
 ---------
 
-At the moment you need to have [PortAudio](http://www.portaudio.com/download.html) installed on your system. We're currently trying to switch over to [CPAL (the purely rust audio lib)](https://github.com/tomaka/cpal) which would remove this dependency.
+At the moment you need to have [PortAudio](http://www.portaudio.com/download.html) installed on your system, but the rust-portaudio crate should take care of this automatically with it's cargo build script.
