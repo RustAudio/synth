@@ -9,7 +9,7 @@
 
 use dsp::Node as DspNode;
 use dsp::Settings as DspSettings;
-use dsp::{AudioBuffer, DspBuffer};
+use dsp::Sample;
 use oscillator::Oscillator;
 use pitch;
 use std::iter::repeat;
@@ -282,13 +282,11 @@ impl Synth {
 
 }
 
-impl<B> DspNode<B> for Synth where B: DspBuffer {
+impl<S> DspNode<S> for Synth where S: Sample {
 
     #[inline]
-    fn audio_requested(&mut self, output: &mut B, settings: DspSettings) {
+    fn audio_requested(&mut self, output: &mut [S], settings: DspSettings) {
         if !self.is_active() { return }
-        let (frames, channels) = (settings.frames as usize, settings.channels as usize);
-        let buffer_size = frames * channels;
         let sample_hz = settings.sample_hz as f64;
         let Synth {
             ref mut voices,
@@ -320,20 +318,13 @@ impl<B> DspNode<B> for Synth where B: DspBuffer {
 
         // Request audio from each voice and sum them together.
         for voice in voices.iter_mut() {
-            let mut working: B = AudioBuffer::zeroed(buffer_size);
+            let mut working = vec![Sample::zero(); settings.buffer_size()];
             voice.fill_buffer(&mut working,
                               settings,
                               duration,
                               loop_data_samples.as_ref(),
                               fade_data_samples.as_ref());
-            for i in 0..frames {
-                for j in 0..channels {
-                    use dsp::Sample;
-                    let idx = i * channels + j;
-                    let working_sample = working.val(idx).mul_amp(vol_per_channel[j]);
-                    *output.get_mut(idx) = *output.get_mut(idx) + working_sample;
-                }
-            }
+            Sample::add_buffers(output, &working[..], &vol_per_channel[..]);
         }
     }
 

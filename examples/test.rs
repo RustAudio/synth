@@ -21,12 +21,11 @@ const SETTINGS: Settings = Settings { sample_hz: 44_100, frames: 256, channels: 
 pub type AudioSample = f32;
 pub type Input = AudioSample;
 pub type Output = AudioSample;
-pub type OutputBuffer = [Output; SETTINGS.frames as usize * SETTINGS.channels as usize];
 
 fn main() {
 
     // Construct the stream and handle any errors that may have occurred.
-    let mut stream = match SoundStream::<OutputBuffer, Input>::new(SETTINGS) {
+    let mut stream = match SoundStream::<Input, Output>::new().settings(SETTINGS).run() {
         Ok(stream) => { println!("It begins!"); stream },
         Err(err) => panic!("An error occurred while constructing SoundStream: {}", err),
     };
@@ -93,7 +92,7 @@ fn main() {
     // The SoundStream iterator will automatically return these events in this order.
     for event in stream.by_ref() {
         match event {
-            Event::Out(buffer) => synth.audio_requested(buffer, SETTINGS),
+            Event::Out(buffer, settings) => synth.audio_requested(buffer, settings),
             Event::Update(dt) => if timer > 0.0 { timer -= dt } else { break },
             _ => (),
         }
