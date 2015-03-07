@@ -6,7 +6,7 @@
 //!
 
 use dsp::Settings as DspSettings;
-use dsp::DspBuffer;
+use dsp::{Sample};
 use oscillator::Oscillator;
 use time::{self, Samples};
 use envelope::{Envelope, Point};
@@ -88,13 +88,12 @@ impl Voice {
 
     /// Generate and fill the audio buffer for the given parameters.
     #[inline]
-    pub fn fill_buffer<B>(&mut self,
-                          output: &mut B,
+    pub fn fill_buffer<S>(&mut self,
+                          output: &mut [S],
                           settings: DspSettings,
                           duration: time::calc::Samples,
                           loop_data: Option<&(LoopStart, LoopEnd)>,
-                          fade_data: Option<&(Attack, Release)>) where B: DspBuffer {
-        let (frames, channels) = (settings.frames as usize, settings.channels as usize);
+                          fade_data: Option<&(Attack, Release)>) where S: Sample {
         let Voice {
             ref mut oscillators,
             ref mut playhead,
@@ -104,7 +103,7 @@ impl Voice {
         let (attack, release) = fade_data.map_or_else(|| (0, 0), |&(a, r)| (a, r));
         let (note_duration, note_freq_multi) = maybe_note.unwrap_or_else(||(duration, 1.0));
 
-        for i in 0..frames {
+        for frame in output.chunks_mut(settings.channels as usize) {
 
             // Calculate the amplitude of the current frames.
             let wave = match (maybe_note.is_some(), *loop_playhead < duration) {
@@ -131,9 +130,8 @@ impl Voice {
             };
 
             // Assign the amp to each channel.
-            for j in 0..channels {
-                use dsp::Sample;
-                *output.get_mut(i * channels + j) = Sample::from_wave(wave);
+            for channel in frame.iter_mut() {
+                *channel = Sample::from_wave(wave);
             }
 
             // Iterate the loop_playhead. If the loop_playhead passes the loop_end,
