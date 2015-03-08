@@ -13,11 +13,11 @@ extern crate "time_calc" as time;
 
 use dsp::{Event, Node, Settings, SoundStream};
 use pitch::{Letter, LetterOctave};
-use time::Ms;
+use synth::Synth;
 
 const SETTINGS: Settings = Settings { sample_hz: 44_100, frames: 256, channels: 2 };
 
-// Currently supports i8, u8, i32, f32.
+// Currently supports i8, i32, f32.
 pub type AudioSample = f32;
 pub type Input = AudioSample;
 pub type Output = AudioSample;
@@ -33,7 +33,7 @@ fn main() {
     // Construct our fancy Synth!
     let mut synth = {
         use envelope::{Envelope, Point};
-        use synth::{Oscillator, Synth, Waveform};
+        use synth::{Oscillator, Waveform};
 
         // The following envelopes should create a downward pitching sine wave that gradually quietens.
         // Try messing around with the points and adding some of your own!
@@ -68,7 +68,7 @@ fn main() {
             .duration(4000.0) // Milliseconds.
             .base_pitch(LetterOctave(Letter::C, 1).hz()) // Hz.
             .loop_points(0.49, 0.51) // Loop start and end points.
-            .fade(500.0, 500.0) // Attack and release.
+            .fade(500.0, 500.0) // Attack and Release in milliseconds.
             .num_voices(16) // By default Synth is monophonic but this gives it `n` voice polyphony.
         // Other methods include:
             // .loop_start(0.0)
@@ -81,19 +81,31 @@ fn main() {
     };
 
     // Construct a note for the synth to perform. Have a play around with the pitch and duration!
-    synth.play_note((
-        Ms(2000.0).samples(SETTINGS.sample_hz as f64), // Note duration in samples.
-        LetterOctave(Letter::C, 1).hz() // Note pitch in hz.
-    ));
+    let note_hz = LetterOctave(Letter::C, 1).hz();
+    let note_velocity = 1.0;
+    println!("note_on");
+    synth.note_on(note_hz, note_velocity);
 
-    // We'll use this to count down from three seconds and then break from the loop.
-    let mut timer: f64 = 3.0;
+    // We'll call this to release the note after 2 seconds.
+    let release_time = 2.0;
+    let mut maybe_note_off = Some(|synth: &mut Synth| synth.note_off(note_hz));
+
+    // We'll use this to keep track of time and break from the loop after 5 seconds.
+    let mut timer: f64 = 0.0;
 
     // The SoundStream iterator will automatically return these events in this order.
     for event in stream.by_ref() {
         match event {
             Event::Out(buffer, settings) => synth.audio_requested(buffer, settings),
-            Event::Update(dt) => if timer > 0.0 { timer -= dt } else { break },
+            Event::Update(dt) => if timer < 5.0 {
+                timer += dt;
+                if timer > release_time {
+                    if let Some(note_off) = maybe_note_off.take() {
+                        println!("note_off");
+                        note_off(&mut synth);
+                    }
+                }
+            } else { break },
             _ => (),
         }
     }
