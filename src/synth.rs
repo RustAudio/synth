@@ -14,7 +14,7 @@ use oscillator::Oscillator;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
-use voice::{Voice, NoteDuration};
+use voice::{Voice, NoteHz, NoteState, NoteVelocity};
 
 pub type Duration = time::calc::Ms;
 pub type BasePitch = pitch::calc::Hz;
@@ -23,7 +23,6 @@ pub type LoopEnd = f64;
 pub type Attack = time::calc::Ms;
 pub type Release = time::calc::Ms;
 pub type Playhead = time::calc::Samples;
-pub type NoteHz = pitch::calc::Hz;
 
 /// The `Synth` generates audio via a vector of `Voice`s,
 /// while a `Voice` generates audio via a vector of
@@ -235,17 +234,17 @@ impl Synth {
         self.voices.iter().any(|voice| voice.maybe_note.is_some())
     }
 
-    /// Trigger playback with an optional given note.
+    /// Begin playback of a note. Synth will try to use a free `Voice` to do this.
+    /// If no `Voice`s are free, the one playing the oldest note will be chosen to
+    /// play the new note instead.
     #[inline]
-    pub fn play_note(&mut self, maybe_note: (NoteDuration, NoteHz)) {
-        self.unpause();
-        let (duration, hz) = maybe_note;
-        let note_freq_multi = hz as f64 / self.base_pitch as f64;
+    pub fn note_on(&mut self, note_hz: NoteHz, note_velocity: NoteVelocity) {
+        let note_freq_multi = note_hz as f64 / self.base_pitch as f64;
         let mut oldest: Option<&mut Voice> = None;
         let mut max_sample_count: i64 = 0;
         for voice in self.voices.iter_mut() {
             if voice.maybe_note.is_none() {
-                voice.play_note((duration, note_freq_multi));
+                voice.note_on(note_hz, note_freq_multi, note_velocity);
                 return;
             }
             else if voice.playhead >= max_sample_count {
@@ -254,7 +253,28 @@ impl Synth {
             }
         }
         if let Some(voice) = oldest {
-            voice.play_note((duration, note_freq_multi))
+            voice.note_on(note_hz, note_freq_multi, note_velocity);
+        }
+    }
+
+    /// Stop playback of the note that was triggered with the matching frequency.
+    #[inline]
+    pub fn note_off(&mut self, note_hz: NoteHz) {
+        let maybe_voice = self.voices.iter_mut().fold(None, |maybe_current_match, voice| {
+            if let Some((NoteState::Playing, voice_note_hz, _, _)) = voice.maybe_note {
+                if voice_note_hz == note_hz {
+                    match maybe_current_match {
+                        None => return Some(voice),
+                        Some(ref current_match) => if voice.playhead >= current_match.playhead {
+                            return Some(voice)
+                        },
+                    }
+                }
+            }
+            maybe_current_match
+        });
+        if let Some(voice) = maybe_voice {
+            voice.note_off();
         }
     }
 
@@ -274,9 +294,7 @@ impl Synth {
     #[inline]
     pub fn stop(&mut self) {
         for voice in self.voices.iter_mut() {
-            voice.maybe_note = None;
-            voice.playhead = 0;
-            voice.loop_playhead = 0;
+            voice.stop();
         }
     }
 
