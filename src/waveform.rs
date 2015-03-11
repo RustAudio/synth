@@ -1,7 +1,7 @@
 
 /// An Oscillator must use one of a variety
 /// of waveform types.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
 pub enum Waveform {
     /// Sine Wave
     Sine,
@@ -12,8 +12,13 @@ pub enum Waveform {
     /// Noise
     Noise,
     /// Noise Walk
-    NoiseWalk
+    NoiseWalk,
+    /// Exponential Saw Wave.
+    SawExp(Steepness),
 }
+
+/// Represents the "steepness" of the exponential saw wave.
+pub type Steepness = f32;
 
 impl Waveform {
 
@@ -28,6 +33,10 @@ impl Waveform {
             Waveform::Square => if (PI_2 * phase).sin() < 0.0 { -1.0 } else { 1.0 },
             Waveform::Noise => ::rand::random::<f64>() * 2.0 - 1.0,
             Waveform::NoiseWalk => noise_walk(phase),
+            Waveform::SawExp(steepness) => {
+                let saw = fmod(phase, 1.0) * -2.0 + 1.0;
+                saw * saw.abs().powf(steepness as f64)
+            },
         };
         amp as f32
     }

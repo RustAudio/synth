@@ -58,7 +58,7 @@ fn main() {
 
         // Now we can create our oscillator from our envelopes.
         let oscillator = Oscillator::new()
-            .waveform(Waveform::Sine) // There are also Saw, Noise, NoiseWalk and Square waveforms.
+            .waveform(Waveform::Sine) // There are also Saw, Noise, NoiseWalk, SawExp and Square waveforms.
             .amplitude(amp_env)
             .frequency(freq_env);
 
