@@ -12,15 +12,14 @@ extern crate rand;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate utils;
 
-pub use env_point::Point as EnvPoint;
-pub use envelope::{Envelope, Point};
-pub use oscillator::Oscillator;
+pub use env_point::Point;
+pub use oscillator::{AmpEnvelope, FreqEnvelope, Oscillator};
 pub use synth::Synth;
 pub use voice::Voice;
 pub use waveform::Waveform;
 
-pub mod env_point;
-pub mod oscillator;
+mod env_point;
+mod oscillator;
 pub mod synth;
 pub mod voice;
 pub mod waveform;
