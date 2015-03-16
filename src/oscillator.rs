@@ -6,8 +6,8 @@ use pitch;
 use envelope::Envelope;
 use waveform::Waveform;
 
-pub type AmpEnvelope = Envelope<Point>;
-pub type FreqEnvelope = Envelope<Point>;
+pub type AmpEnvelope = Envelope<f64, f64, Point>;
+pub type FreqEnvelope = Envelope<f64, f64, Point>;
 
 /// The fundamental component of a synthesizer.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
@@ -31,8 +31,10 @@ impl Oscillator {
         Oscillator {
             waveform: Waveform::Sine,
             phase: 0.0,
-            amplitude: Envelope::zeroed(),
-            frequency: Envelope::zeroed(),
+            amplitude: Envelope::from_points(vec![Point::new(0.0, 0.0, 0.0),
+                                                  Point::new(1.0, 0.0, 0.0)]),
+            frequency: Envelope::from_points(vec![Point::new(0.0, 0.0, 0.0),
+                                                  Point::new(1.0, 0.0, 0.0)]),
             gaussian_perc: 0.0,
         }
     }
@@ -69,7 +71,11 @@ impl Oscillator {
         let freq_at_ratio = self.freq_at_ratio(ratio) * note_freq_multi;
         // Determine the next phase with respect to frequency and sample rate.
         self.phase = phase + (freq_at_ratio / sample_hz);
-        self.waveform.amp_at_phase(phase) * self.amplitude.y(ratio) as f32
+        let env_amplitude = match self.amplitude.y(ratio) {
+            Some(y) => y as f32,
+            None => panic!("The given ratio is out of range of the Envelope's X axis."),
+        };
+        self.waveform.amp_at_phase(phase) * env_amplitude
     }
 
     /// Calculate and return the frequency at
@@ -77,7 +83,10 @@ impl Oscillator {
     #[inline]
     pub fn freq_at_ratio(&self, ratio: f64) -> f64 {
         use gaussian;
-        let mut freq = self.frequency.y(ratio);
+        let mut freq = match self.frequency.y(ratio) {
+            Some(y) => y,
+            None => panic!("The given ratio is out of range of the Envelope's X axis."),
+        };
         if self.waveform == Waveform::NoiseWalk {
             freq = pitch::ScaledPerc(freq, 0.6).perc()
         }

@@ -6,7 +6,6 @@
 //!
 
 extern crate dsp;
-extern crate envelope;
 extern crate "pitch_calc" as pitch;
 extern crate synth;
 extern crate "time_calc" as time;
@@ -32,12 +31,11 @@ fn main() {
 
     // Construct our fancy Synth!
     let mut synth = {
-        use envelope::{Envelope, Point};
-        use synth::{Oscillator, Waveform};
+        use synth::{AmpEnvelope, FreqEnvelope, Point, Oscillator, Waveform};
 
         // The following envelopes should create a downward pitching sine wave that gradually quietens.
         // Try messing around with the points and adding some of your own!
-        let amp_env = Envelope::from_points(vec!(
+        let amp_env = AmpEnvelope::from_points(vec!(
             //         Time ,  Amp ,  Curve
             Point::new(0.0  ,  0.0 ,  0.0),
             Point::new(0.01 ,  1.0 ,  0.0),
@@ -45,7 +43,7 @@ fn main() {
             Point::new(0.81 ,  0.8 ,  0.0),
             Point::new(1.0  ,  0.0 ,  0.0),
         ));
-        let freq_env = Envelope::from_points(vec!(
+        let freq_env = FreqEnvelope::from_points(vec!(
             //         Time    , Freq   , Curve
             Point::new(0.0     , 0.0    , 0.0),
             Point::new(0.00136 , 1.0    , 0.0),

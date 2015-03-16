@@ -9,7 +9,8 @@ use dsp::Settings as DspSettings;
 use dsp::{Sample};
 use oscillator::Oscillator;
 use time::{self, Samples};
-use envelope::{Envelope, Point};
+use env_point::Point;
+use envelope::Envelope;
 use waveform::Waveform;
 
 pub type Playhead = time::calc::Samples;
