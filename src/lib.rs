@@ -6,10 +6,10 @@
 extern crate dsp;
 extern crate envelope;
 extern crate gaussian;
-extern crate "pitch_calc" as pitch;
-extern crate "time_calc" as time;
+extern crate pitch_calc as pitch;
+extern crate time_calc as time;
 extern crate rand;
-extern crate "rustc-serialize" as rustc_serialize;
+extern crate rustc_serialize;
 extern crate utils;
 
 pub use env_point::Point;

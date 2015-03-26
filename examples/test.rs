@@ -6,9 +6,9 @@
 //!
 
 extern crate dsp;
-extern crate "pitch_calc" as pitch;
+extern crate pitch_calc as pitch;
 extern crate synth;
-extern crate "time_calc" as time;
+extern crate time_calc as time;
 
 use dsp::{Event, Node, Settings, SoundStream};
 use pitch::{Letter, LetterOctave};
