@@ -1,11 +1,10 @@
 
 //! Implementation of the `Synth` struct for basic polyphonic, multi-oscillator envelope synthesis.
 
-#![feature(core)]
-
 extern crate dsp;
 extern crate envelope;
 extern crate gaussian;
+extern crate num;
 extern crate pitch_calc as pitch;
 extern crate time_calc as time;
 extern crate rand;

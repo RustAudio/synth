@@ -24,9 +24,10 @@ impl Waveform {
 
     /// Return the amplitude of a waveform at a given phase.
     pub fn amp_at_phase(&self, phase: f64) -> f32 {
-        use std::f64::consts::PI_2;
-        use std::num::Float;
+        use num::Float;
+        use std::f64::consts::PI;
         use utils::{fmod, noise_walk};
+        const PI_2: f64 = PI * 2.0;
         let amp = match *self {
             Waveform::Sine => (PI_2 * phase).sin(),
             Waveform::Saw => fmod(phase, 1.0) * -2.0 + 1.0,
