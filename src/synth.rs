@@ -321,7 +321,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
 
         // Convert the loop points from duration percentages to samples.
         let loop_data_samples = loop_data.map(|(start_perc, end_perc)| {
-            use std::num::Float;
+            use num::Float;
             ((start_perc * duration as f64).round() as time::calc::Samples,
              (end_perc * duration as f64).round() as time::calc::Samples)
         });
