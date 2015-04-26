@@ -332,17 +332,20 @@ impl<S> DspNode<S> for Synth where S: Sample {
         });
 
         let amp_multi = vol * normaliser;
-        let vol_per_channel = [amp_multi; 2];
+        //let vol_per_channel = [amp_multi; 2];
 
         // Request audio from each voice and sum them together.
         for voice in voices.iter_mut() {
-            let mut working = vec![Sample::zero(); settings.buffer_size()];
+            let mut working: Vec<S> = vec![Sample::zero(); settings.buffer_size()];
             voice.fill_buffer(&mut working,
                               settings,
                               duration,
                               loop_data_samples.as_ref(),
                               fade_data_samples.as_ref());
-            Sample::add_buffers(output, &working[..], &vol_per_channel[..]);
+            for (output_sample, sample) in output.iter_mut().zip(working.into_iter()) {
+                *output_sample = *output_sample + sample.mul_amp(amp_multi);
+            }
+            //Sample::add_buffers(output, &working, &vol_per_channel);
         }
     }
 

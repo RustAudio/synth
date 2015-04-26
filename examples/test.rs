@@ -10,11 +10,9 @@ extern crate pitch_calc as pitch;
 extern crate synth;
 extern crate time_calc as time;
 
-use dsp::{Event, Node, Settings, SoundStream};
+use dsp::{CallbackFlags, CallbackResult, Node, Sample, SoundStream, Settings, StreamParams};
 use pitch::{Letter, LetterOctave};
 use synth::Synth;
-
-const SETTINGS: Settings = Settings { sample_hz: 44_100, frames: 256, channels: 2 };
 
 // Currently supports i8, i32, f32.
 pub type AudioSample = f32;
@@ -22,12 +20,6 @@ pub type Input = AudioSample;
 pub type Output = AudioSample;
 
 fn main() {
-
-    // Construct the stream and handle any errors that may have occurred.
-    let mut stream = match SoundStream::<Input, Output>::new().settings(SETTINGS).run() {
-        Ok(stream) => { println!("It begins!"); stream },
-        Err(err) => panic!("An error occurred while constructing SoundStream: {}", err),
-    };
 
     // Construct our fancy Synth!
     let mut synth = {
@@ -86,32 +78,33 @@ fn main() {
 
     // We'll call this to release the note after 2 seconds.
     let release_time = 2.0;
-    let mut maybe_note_off = Some(|synth: &mut Synth| synth.note_off(note_hz));
+    let mut maybe_note_off = Some(move |synth: &mut Synth| synth.note_off(note_hz));
 
     // We'll use this to keep track of time and break from the loop after 5 seconds.
     let mut timer: f64 = 0.0;
 
-    // The SoundStream iterator will automatically return these events in this order.
-    for event in stream.by_ref() {
-        match event {
-            Event::Out(buffer, settings) => synth.audio_requested(buffer, settings),
-            Event::Update(dt) => if timer < 5.0 {
-                timer += dt;
-                if timer > release_time {
-                    if let Some(note_off) = maybe_note_off.take() {
-                        println!("note_off");
-                        note_off(&mut synth);
-                    }
+    // The callback we'll use to pass to the Stream. It will write a 440hz sine wave to the output.
+    let callback = Box::new(move |output: &mut[f32], settings: Settings, dt: f64, _: CallbackFlags| {
+        Sample::zero_buffer(output);
+        synth.audio_requested(output, settings);
+        if timer < 5.0 {
+            timer += dt;
+            if timer > release_time {
+                if let Some(note_off) = maybe_note_off.take() {
+                    println!("note_off");
+                    note_off(&mut synth);
                 }
-            } else { break },
-            _ => (),
+            }
+            CallbackResult::Continue
+        } else {
+            CallbackResult::Complete
         }
-    }
+    });
 
-    // Close the stream and shut down PortAudio.
-    match stream.close() {
-        Ok(()) => println!("Great success!"),
-        Err(err) => println!("An error occurred while closing SoundStream: {}", err),
-    }
+    // Construct the default, non-blocking output stream and run our callback.
+    let stream = SoundStream::new().output(StreamParams::new()).run_callback(callback).unwrap();
+
+    // Loop while the stream is active.
+    while let Ok(true) = stream.is_active() {}
 
 }
