@@ -3,6 +3,7 @@
 //!
 //!  Created by Mitchell Nordine at 05:57PM on December 19, 2014.
 //!
+//!  Always remember to run high performance Rust code with the --release flag. `Synth` 
 //!
 
 extern crate dsp;
