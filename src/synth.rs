@@ -208,9 +208,9 @@ impl Synth {
     }
 
     /// Add a default oscillator.
-    pub fn add_oscillator(&mut self) {
+    pub fn add_oscillator(&mut self, oscillator: Oscillator) {
         for voice in self.voices.iter_mut() {
-            voice.oscillators.push(Oscillator::new())
+            voice.oscillators.push(oscillator.clone())
         }
     }
 
@@ -223,7 +223,7 @@ impl Synth {
             voice.oscillators.remove(idx);
         }
         if self.voices[0].oscillators.len() == 0 {
-            self.add_oscillator()
+            self.add_oscillator(Oscillator::new())
         }
     }
 
