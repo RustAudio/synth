@@ -21,6 +21,8 @@ pub struct Oscillator {
     pub amplitude: AmpEnvelope,
     /// Envelope for interpolation of frequency.
     pub frequency: FreqEnvelope,
+    /// Whether or not the Oscillator is currently muted.
+    pub is_muted: bool,
 }
 
 impl Oscillator {
@@ -36,6 +38,7 @@ impl Oscillator {
             frequency: Envelope::from_points(vec![Point::new(0.0, 0.0, 0.0),
                                                   Point::new(1.0, 0.0, 0.0)]),
             gaussian_perc: 0.0,
+            is_muted: false,
         }
     }
 
