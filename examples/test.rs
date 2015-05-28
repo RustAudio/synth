@@ -84,7 +84,7 @@ fn main() {
     // We'll use this to keep track of time and break from the loop after 5 seconds.
     let mut timer: f64 = 0.0;
 
-    // The callback we'll use to pass to the Stream. It will write a 440hz sine wave to the output.
+    // The callback we'll use to pass to the Stream.
     let callback = Box::new(move |output: &mut[f32], settings: Settings, dt: f64, _: CallbackFlags| {
         Sample::zero_buffer(output);
         synth.audio_requested(output, settings);

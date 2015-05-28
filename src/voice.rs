@@ -139,7 +139,7 @@ impl Voice {
                 let ratio = *loop_playhead as f64 / duration as f64;
                 let note_state = maybe_note.map(|(state, _, _, _)| state).unwrap();
                 // Sum the amplitude of each oscillator at the given ratio.
-                oscillators.iter_mut().fold(0.0, |total, osc| {
+                oscillators.iter_mut().filter(|osc| !osc.is_muted).fold(0.0, |total, osc| {
                     let mut wave = osc.amp_at_ratio(ratio,
                                                     freq_multi,
                                                     settings.sample_hz as f64);
