@@ -56,9 +56,6 @@ impl Voice {
         }
     }
 
-    /// Default constructor for a Voice with a single Oscillator.
-    pub fn default() -> Voice { Voice::new(1) }
-
     /// Trigger playback with the given note, resetting all playheads.
     #[inline]
     pub fn note_on(&mut self, hz: NoteHz, freq_multi: NoteFreqMulti, vel: NoteVelocity) {
