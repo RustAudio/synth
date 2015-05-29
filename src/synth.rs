@@ -29,6 +29,8 @@ pub type Playhead = time::calc::Samples;
 /// `Oscillator`s, creating a small DSP tree.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
 pub struct Synth {
+    /// Oscillators for playback.
+    pub oscillators: Vec<Oscillator>,
     /// Vector of inputs to the Synth. Polyphonic synth instruments
     /// will utilise a vector with more than one voice.
     pub voices: Vec<Voice>,
@@ -57,7 +59,8 @@ impl Synth {
     #[inline]
     pub fn new() -> Synth {
         Synth {
-            voices: vec!(),
+            oscillators: vec![Oscillator::new()],
+            voices: vec![Voice::new(1)],
             duration: MS_300,
             base_pitch: C_1,
             vol: 1.0,
@@ -75,7 +78,7 @@ impl Synth {
         let len = self.voices.len();
         if num_voices == len { return self }
         let voices = if len == 0 {
-            repeat(Voice::new(vec!())).take(num_voices).collect()
+            repeat(Voice::new(self.oscillators.len())).take(num_voices).collect()
         } else if len < num_voices {
             let last_voice = self.voices[len-1].clone();
             self.voices.into_iter().chain(repeat(last_voice).take(num_voices - len)).collect()
@@ -88,25 +91,21 @@ impl Synth {
     /// Add an oscillator to a Synth.
     #[inline]
     pub fn oscillator(mut self, oscillator: Oscillator) -> Synth {
-        if self.voices.len() == 0 {
-            self.voices.push(Voice::new(vec!(oscillator)))
-        } else {
-            for voice in &mut self.voices {
-                voice.oscillators.push(oscillator.clone());
-            }
+        self.oscillators.push(oscillator);
+        for voice in self.voices.iter_mut() {
+            voice.oscillator_phases.push(0.0);
         }
         self
     }
 
     /// Add multiple oscillators to a Synth.
     #[inline]
-    pub fn oscillators(mut self, oscillators: &[Oscillator]) -> Synth {
-        let new_oscillators = || oscillators.iter().map(|o| o.clone());
-        if self.voices.len() == 0 {
-            self.voices.push(Voice::new(new_oscillators().collect()))
-        }
-        for voice in &mut self.voices {
-            voice.oscillators.extend(new_oscillators())
+    pub fn oscillators<I: Iterator<Item=Oscillator>>(mut self, oscillators: I) -> Synth {
+        self.oscillators.extend(oscillators);
+        for voice in self.voices.iter_mut() {
+            let num = voice.oscillator_phases.len();
+            let target_num = self.oscillators.len();
+            voice.oscillator_phases.extend((num..target_num).map(|_| 0.0));
         }
         self
     }
@@ -187,44 +186,20 @@ impl Synth {
         Synth { fade_data: fade_data, ..self }
     }
 
-    /// Construct a Synth from it's Voices rather than Oscillators and a number of voices.
-    pub fn from_voices(voices: Vec<Voice>,
-                       base_pitch: BasePitch,
-                       duration: Duration,
-                       vol: f32,
-                       normaliser: f32,
-                       loop_data: Option<(LoopStart, LoopEnd)>,
-                       fade_data: Option<(Attack, Release)>) -> Synth {
-        Synth {
-            voices: voices,
-            duration: duration,
-            base_pitch: base_pitch,
-            vol: vol,
-            normaliser: normaliser,
-            loop_data: loop_data,
-            fade_data: fade_data,
-            is_paused: false,
-        }
-    }
-
-    /// Add a default oscillator.
+    /// Add an oscillator.
     pub fn add_oscillator(&mut self, oscillator: Oscillator) {
+        self.oscillators.push(oscillator);
         for voice in self.voices.iter_mut() {
-            voice.oscillators.push(oscillator.clone())
+            voice.oscillator_phases.push(0.0);
         }
     }
 
-    /// Remove an oscillator.
-    pub fn remove_oscillator(&mut self, idx: usize) {
-        assert!(self.voices[0].oscillators.len() > idx,
-                "Synth::remove_oscillator - the given idx ({}) is greater than \
-                the number of oscillators in the first voice!", idx);
+    /// Remove and return the oscillator at the given idx.
+    pub fn remove_oscillator(&mut self, idx: usize) -> Oscillator {
         for voice in self.voices.iter_mut() {
-            voice.oscillators.remove(idx);
+            voice.oscillator_phases.remove(idx);
         }
-        if self.voices[0].oscillators.len() == 0 {
-            self.add_oscillator(Oscillator::new())
-        }
+        self.oscillators.remove(idx)
     }
 
     /// Return whether or not there are any currently active voices.
@@ -307,6 +282,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
         if !self.is_active() { return }
         let sample_hz = settings.sample_hz as f64;
         let Synth {
+            ref oscillators,
             ref mut voices,
             duration,
             vol,
@@ -339,6 +315,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
             let mut working: Vec<S> = vec![Sample::zero(); settings.buffer_size()];
             voice.fill_buffer(&mut working,
                               settings,
+                              oscillators,
                               duration,
                               loop_data_samples.as_ref(),
                               fade_data_samples.as_ref());

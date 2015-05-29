@@ -12,7 +12,6 @@ pub type FreqEnvelope = Envelope<f64, f64, Point>;
 /// The fundamental component of a synthesizer.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
 pub struct Oscillator {
-    phase: f64,
     /// Waveform used for phase movement.
     pub waveform: Waveform,
     /// The percentage of randomness to be applied to freq.
@@ -32,7 +31,6 @@ impl Oscillator {
     pub fn new() -> Oscillator {
         Oscillator {
             waveform: Waveform::Sine,
-            phase: 0.0,
             amplitude: Envelope::from_points(vec![Point::new(0.0, 0.0, 0.0),
                                                   Point::new(1.0, 0.0, 0.0)]),
             frequency: Envelope::from_points(vec![Point::new(0.0, 0.0, 0.0),
@@ -69,16 +67,19 @@ impl Oscillator {
 
     /// Calculate and return the amplitude at the given ratio.
     #[inline]
-    pub fn amp_at_ratio(&mut self, ratio: f64, note_freq_multi: f64, sample_hz: f64) -> f32 {
-        let phase = self.phase;
-        let freq_at_ratio = self.freq_at_ratio(ratio) * note_freq_multi;
-        // Determine the next phase with respect to frequency and sample rate.
-        self.phase = phase + (freq_at_ratio / sample_hz);
+    pub fn amp_at_ratio(&self, phase: f64, ratio: f64) -> f32 {
         let env_amplitude = match self.amplitude.y(ratio) {
             Some(y) => y as f32,
-            None => panic!("The given ratio is out of range of the Envelope's X axis."),
+            None => panic!("The given ratio {:?} is out of range of the Envelope's X axis.", ratio),
         };
         self.waveform.amp_at_phase(phase) * env_amplitude
+    }
+
+    /// Calculate and return the next phase for the given phase.
+    #[inline]
+    pub fn next_phase(&self, phase: f64, ratio: f64, note_freq_multi: f64, sample_hz: f64) -> f64 {
+        let freq_at_ratio = self.freq_at_ratio(ratio) * note_freq_multi;
+        phase + (freq_at_ratio / sample_hz)
     }
 
     /// Calculate and return the frequency at

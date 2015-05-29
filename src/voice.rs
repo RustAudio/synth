@@ -9,9 +9,6 @@ use dsp::Settings as DspSettings;
 use dsp::{Sample};
 use oscillator::Oscillator;
 use time::{self, Samples};
-use env_point::Point;
-use envelope::Envelope;
-use waveform::Waveform;
 
 pub type Playhead = time::calc::Samples;
 pub type LoopStart = time::calc::Samples;
@@ -28,8 +25,8 @@ pub type NoteVelocity = f32;
 /// of any number of Voices.
 #[derive(Clone, Debug, RustcEncodable, RustcDecodable)]
 pub struct Voice {
-    /// Oscillators for playback.
-    pub oscillators: Vec<Oscillator>,
+    /// The current phase for each oscillator owned by the Synth.
+    pub oscillator_phases: Vec<f64>,
     /// Data for a note, if there is one currently being played.
     pub maybe_note: Option<(NoteState, NoteHz, NoteFreqMulti, NoteVelocity)>,
     /// Playhead over the current note.
@@ -50,44 +47,13 @@ pub enum NoteState {
 impl Voice {
 
     /// Constructor for a Voice.
-    pub fn new(oscillators: Vec<Oscillator>) -> Voice {
+    pub fn new(num_oscillators: usize) -> Voice {
         Voice {
-            oscillators: oscillators,
+            oscillator_phases: (0..num_oscillators).map(|_| 0.0).collect(),
             maybe_note: None,
             playhead: 0,
             loop_playhead: 0,
         }
-    }
-
-    /// Default constructor for a Voice with a single Oscillator.
-    pub fn default() -> Voice {
-        Voice::new(vec!(Oscillator::new()))
-    }
-
-    /// Testing constructor. Creates a basic Kick sound.
-    pub fn test_demo() -> Voice {
-        let amp_env = Envelope::from_points(vec!(
-            Point::new(0.0,  0.0, 0.0),
-            Point::new(0.01, 1.0, 0.0),
-            Point::new(0.45, 1.0, 0.0),
-            Point::new(0.81, 0.8, 0.0),
-            Point::new(1.0,  0.0, 0.0),
-        ));
-        let freq_env = Envelope::from_points(vec!(
-            Point::new(0.0,     0.0,    0.0),
-            Point::new(0.00136, 1.0   , 0.0),
-            Point::new(0.015  , 0.01  , 0.0),
-            Point::new(0.045  , 0.005 , 0.0),
-            Point::new(0.1    , 0.0022, 0.0),
-            Point::new(0.35   , 0.0011, 0.0),
-            Point::new(1.0,     0.0,    0.0),
-        ));
-        let oscillator = Oscillator::new()
-            .waveform(Waveform::Sine)
-            .amplitude(amp_env)
-            .frequency(freq_env);
-
-        Voice::new(vec!(oscillator))
     }
 
     /// Trigger playback with the given note, resetting all playheads.
@@ -107,6 +73,7 @@ impl Voice {
     /// Stop playback of the current note if there is one and reset the playheads.
     #[inline]
     pub fn stop(&mut self) {
+        for phase in self.oscillator_phases.iter_mut() { *phase = 0.0; }
         self.maybe_note = None;
         self.playhead = 0;
         self.loop_playhead = 0;
@@ -117,13 +84,14 @@ impl Voice {
     pub fn fill_buffer<S>(&mut self,
                           output: &mut [S],
                           settings: DspSettings,
+                          oscillators: &[Oscillator],
                           duration: time::calc::Samples,
                           loop_data: Option<&(LoopStart, LoopEnd)>,
                           fade_data: Option<&(Attack, Release)>)
         where S: Sample
     {
         let Voice {
-            ref mut oscillators,
+            ref mut oscillator_phases,
             ref mut playhead,
             ref mut loop_playhead,
             ref mut maybe_note,
@@ -139,10 +107,11 @@ impl Voice {
                 let ratio = *loop_playhead as f64 / duration as f64;
                 let note_state = maybe_note.map(|(state, _, _, _)| state).unwrap();
                 // Sum the amplitude of each oscillator at the given ratio.
-                oscillators.iter_mut().filter(|osc| !osc.is_muted).fold(0.0, |total, osc| {
-                    let mut wave = osc.amp_at_ratio(ratio,
-                                                    freq_multi,
-                                                    settings.sample_hz as f64);
+                let active_oscillators = oscillators.iter().filter(|osc| !osc.is_muted);
+                active_oscillators.enumerate().fold(0.0, |total, (i, osc)| {
+                    let phase = &mut oscillator_phases[i];
+                    let mut wave = osc.amp_at_ratio(*phase, ratio);
+                    *phase = osc.next_phase(*phase, ratio, freq_multi, settings.sample_hz as f64);
                     // If within the attack duration, apply the fade.
                     if *playhead < attack {
                         wave *= *playhead as f32 / attack as f32;
