@@ -6,8 +6,8 @@ use pitch;
 use envelope::Envelope;
 use waveform::Waveform;
 
-pub type AmpEnvelope = Envelope<f64, f64, Point>;
-pub type FreqEnvelope = Envelope<f64, f64, Point>;
+pub type AmpEnvelope = Envelope<Point>;
+pub type FreqEnvelope = Envelope<Point>;
 
 /// The fundamental component of a synthesizer.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
