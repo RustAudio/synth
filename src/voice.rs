@@ -10,6 +10,7 @@ use dsp::{Sample};
 use oscillator::Oscillator;
 use time::{self, Samples};
 
+
 pub type Playhead = time::calc::Samples;
 pub type LoopStart = time::calc::Samples;
 pub type LoopEnd = time::calc::Samples;
@@ -44,6 +45,7 @@ pub enum NoteState {
     Released(Playhead),
 }
 
+
 impl Voice {
 
     /// Constructor for a Voice.
@@ -60,6 +62,11 @@ impl Voice {
     #[inline]
     pub fn note_on(&mut self, hz: NoteHz, freq_multi: NoteFreqMulti, vel: NoteVelocity) {
         self.maybe_note = Some((NoteState::Playing, hz, freq_multi, vel));
+    }
+
+    /// Reset the voice's playheads.
+    #[inline]
+    pub fn reset_playheads(&mut self) {
         self.playhead = 0;
         self.loop_playhead = 0;
     }
