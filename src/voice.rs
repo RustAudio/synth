@@ -58,17 +58,17 @@ impl Voice {
         }
     }
 
-    /// Trigger playback with the given note, resetting all playheads.
-    #[inline]
-    pub fn note_on(&mut self, hz: NoteHz, freq_multi: NoteFreqMulti, vel: NoteVelocity) {
-        self.maybe_note = Some((NoteState::Playing, hz, freq_multi, vel));
-    }
-
     /// Reset the voice's playheads.
     #[inline]
     pub fn reset_playheads(&mut self) {
         self.playhead = 0;
         self.loop_playhead = 0;
+    }
+
+    /// Trigger playback with the given note, resetting all playheads.
+    #[inline]
+    pub fn note_on(&mut self, hz: NoteHz, freq_multi: NoteFreqMulti, vel: NoteVelocity) {
+        self.maybe_note = Some((NoteState::Playing, hz, freq_multi, vel));
     }
 
     /// Release playback of the current not eif there is one.

@@ -14,7 +14,7 @@ use oscillator::Oscillator;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
-use voice::{Voice, NoteHz, NoteState, NoteVelocity};
+use voice::{Voice, NoteFreqMulti, NoteHz, NoteState, NoteVelocity};
 
 pub type Duration = time::calc::Ms;
 pub type BasePitch = pitch::calc::Hz;
@@ -23,6 +23,7 @@ pub type LoopEnd = f64;
 pub type Attack = time::calc::Ms;
 pub type Release = time::calc::Ms;
 pub type Playhead = time::calc::Samples;
+
 
 /// The mode in which the Synth will handle notes.
 #[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
@@ -34,12 +35,15 @@ pub enum Mode {
 }
 
 /// The state of monophony.
-#[derive(Copy, Clone, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
 pub enum Mono {
     /// New notes will reset the voice's playheads
     Normal,
-    /// New notes will not reset the voice's playheads.
-    Legato,
+    /// If a note is already playing, new notes will not reset the voice's playheads.
+    /// A stack of notes is kept - if a NoteOff occurs on the current note, it is replaced with the
+    /// note at the top of the stack if there is one. The stacked notes are reset if the voice
+    /// becomes inactive.
+    Legato(Vec<(NoteHz, NoteFreqMulti)>),
 }
 
 /// The `Synth` generates audio via a vector of `Voice`s,
@@ -69,6 +73,14 @@ pub struct Synth {
 
 const MS_300: Duration = 300.0;
 const C_1: BasePitch = 32.703;
+
+
+impl Mono {
+    /// Construct the default legato.
+    pub fn new_legato() -> Mono {
+        Mono::Legato(Vec::with_capacity(16))
+    }
+}
 
 
 impl Synth {
@@ -127,7 +139,7 @@ impl Synth {
         if on {
             self = self.num_voices(1);
             if let Mode::Mono(_, ref mut mono) = self.mode {
-                *mono = Mono::Legato;
+                *mono = Mono::Legato(Vec::new());
             }
         }
         self
@@ -269,6 +281,14 @@ impl Synth {
         }
     }
 
+    /// Return the number of voices.
+    pub fn voices_len(&self) -> usize {
+        match self.mode {
+            Mode::Mono(_, _) => 1,
+            Mode::Poly(ref voices) => voices.len(),
+        }
+    }
+
     /// Begin playback of a note. Synth will try to use a free `Voice` to do this.
     /// If no `Voice`s are free, the one playing the oldest note will be chosen to
     /// play the new note instead.
@@ -276,8 +296,15 @@ impl Synth {
     pub fn note_on(&mut self, note_hz: NoteHz, note_velocity: NoteVelocity) {
         let note_freq_multi = note_hz as f64 / self.base_pitch as f64;
         match self.mode {
-            Mode::Mono(ref mut voice, mono) => {
-                if let Mono::Normal = mono {
+            Mode::Mono(ref mut voice, Mono::Normal) => {
+                voice.reset_playheads();
+                voice.note_on(note_hz, note_freq_multi, note_velocity);
+            },
+            Mode::Mono(ref mut voice, Mono::Legato(ref mut notes)) => {
+                if let Some((NoteState::Playing, hz, freq_multi, _)) = voice.maybe_note.take() {
+                    notes.push((hz, freq_multi));
+                } else {
+                    notes.clear();
                     voice.reset_playheads();
                 }
                 voice.note_on(note_hz, note_freq_multi, note_velocity);
@@ -312,7 +339,25 @@ impl Synth {
             _ => false,
         };
         match self.mode {
-            Mode::Mono(ref mut voice, _) => if is_match(voice) { voice.note_off() },
+            Mode::Mono(ref mut voice, Mono::Normal) => if is_match(voice) { voice.note_off() },
+            Mode::Mono(ref mut voice, Mono::Legato(ref mut notes)) => {
+                if is_match(voice) {
+                    if let Some((_, _, _, vel)) = voice.maybe_note {
+                        if let Some((old_hz, old_freq_multi)) = notes.pop() {
+                            voice.note_on(old_hz, old_freq_multi, vel);
+                            return;
+                        }
+                    }
+                    voice.note_off();
+                } else {
+                    for i in (0..notes.len()).rev() {
+                        let (hz, _) = notes[i];
+                        if hz == note_hz {
+                            notes.remove(i);
+                        }
+                    }
+                }
+            },
             Mode::Poly(ref mut voices) => {
                 let maybe_voice = voices.iter_mut().fold(None, |maybe_current_match, voice| {
                     if is_match(voice) {
