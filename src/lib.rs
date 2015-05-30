@@ -13,7 +13,7 @@ extern crate utils;
 
 pub use env_point::Point;
 pub use oscillator::{AmpEnvelope, FreqEnvelope, Oscillator};
-pub use synth::Synth;
+pub use synth::{empty_note_stack, Mode, Mono, Synth};
 pub use voice::Voice;
 pub use waveform::Waveform;
 
