@@ -107,9 +107,9 @@ impl Voice {
                 let ratio = *loop_playhead as f64 / duration as f64;
                 let note_state = maybe_note.map(|(state, _, _, _)| state).unwrap();
                 // Sum the amplitude of each oscillator at the given ratio.
-                let active_oscillators = oscillators.iter().filter(|osc| !osc.is_muted);
-                active_oscillators.enumerate().fold(0.0, |total, (i, osc)| {
-                    let phase = &mut oscillator_phases[i];
+                let active_oscillators = oscillators.iter().zip(oscillator_phases.iter_mut())
+                    .filter(|&(osc, _)| !osc.is_muted);
+                active_oscillators.fold(0.0, |total, (osc, phase)| {
                     let mut wave = osc.amp_at_ratio(*phase, ratio);
                     *phase = osc.next_phase(*phase, ratio, freq_multi, settings.sample_hz as f64);
                     // If within the attack duration, apply the fade.
