@@ -50,9 +50,7 @@ pub struct Synth {
     /// Base pitch of the Synth instrument in Steps.
     pub base_pitch: BasePitch,
     /// Amplitude multiplier (volume).
-    pub vol: f32,
-    /// Normaliser for the Synth.
-    pub normaliser: f32,
+    pub volume: f32,
     /// Data used for looping over a duration of the Synth.
     pub loop_data: Option<(LoopStart, LoopEnd)>,
     /// Data used for fading in / out from playback.
@@ -105,8 +103,7 @@ impl Synth {
             spread: 0.0,
             duration: MS_300,
             base_pitch: C_1,
-            vol: 1.0,
-            normaliser: 1.0,
+            volume: 1.0,
             loop_data: None,
             fade_data: None,
             is_paused: false,
@@ -223,13 +220,7 @@ impl Synth {
 
     /// Set the Synth's volume.
     pub fn volume(mut self, vol: f32) -> Synth {
-        self.vol = vol;
-        self
-    }
-
-    /// Set the Synth's normaliser.
-    pub fn normaliser(mut self, normaliser: f32) -> Synth {
-        self.normaliser = normaliser;
+        self.volume = vol;
         self
     }
 
@@ -456,8 +447,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
             ref mut voices,
             spread,
             duration,
-            vol,
-            normaliser,
+            volume,
             ref loop_data,
             ref fade_data,
             ..
@@ -480,7 +470,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
 
         // Determine the amplitude for each channel.
         let amp_per_channel = (0..settings.channels as usize).zip(channels.iter()).map(|(_, amp)| {
-            *amp * vol* normaliser
+            *amp * volume
         }).collect::<Vec<_>>();
 
         // Prepare a Vec to use for calculating the pan for each voice.
