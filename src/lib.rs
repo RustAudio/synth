@@ -5,6 +5,7 @@ extern crate dsp;
 extern crate envelope;
 extern crate gaussian;
 extern crate num;
+extern crate panning;
 extern crate pitch_calc as pitch;
 extern crate time_calc as time;
 extern crate rand;

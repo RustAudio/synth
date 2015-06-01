@@ -49,18 +49,21 @@ fn main() {
 
         // Now we can create our oscillator from our envelopes.
         let oscillator = Oscillator::new()
-            .waveform(Waveform::Sine) // There are also Saw, Noise, NoiseWalk, SawExp and Square waveforms.
+            .waveform(Waveform::Saw) // There are also Sine, Noise, NoiseWalk, SawExp and Square waveforms.
             .amplitude(amp_env)
             .frequency(freq_env);
 
         // Here we construct our Synth from our oscillator.
         Synth::new()
             .oscillator(oscillator) // Add as many different oscillators as desired.
-            .duration(4000.0) // Milliseconds.
+            .duration(6000.0) // Milliseconds.
             .base_pitch(LetterOctave(Letter::C, 1).hz()) // Hz.
             .loop_points(0.49, 0.51) // Loop start and end points.
             .fade(500.0, 500.0) // Attack and Release in milliseconds.
             .num_voices(16) // By default Synth is monophonic but this gives it `n` voice polyphony.
+            .volume(0.10)
+            .detune(0.5)
+            .spread(1.0)
 
         // Other methods include:
             // .loop_start(0.0)
@@ -78,18 +81,18 @@ fn main() {
     println!("note_on");
     synth.note_on(note_hz, note_velocity);
 
-    // We'll call this to release the note after 2 seconds.
-    let release_time = 2.0;
+    // We'll call this to release the note after 4 seconds.
+    let release_time = 4.0;
     let mut maybe_note_off = Some(move |synth: &mut Synth| synth.note_off(note_hz));
 
-    // We'll use this to keep track of time and break from the loop after 5 seconds.
+    // We'll use this to keep track of time and break from the loop after 6 seconds.
     let mut timer: f64 = 0.0;
 
     // The callback we'll use to pass to the Stream.
     let callback = Box::new(move |output: &mut[f32], settings: Settings, dt: f64, _: CallbackFlags| {
         Sample::zero_buffer(output);
         synth.audio_requested(output, settings);
-        if timer < 5.0 {
+        if timer < 6.0 {
             timer += dt;
             if timer > release_time {
                 if let Some(note_off) = maybe_note_off.take() {
