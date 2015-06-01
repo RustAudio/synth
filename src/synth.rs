@@ -451,7 +451,6 @@ impl<S> DspNode<S> for Synth where S: Sample {
         if !self.is_active() { return }
         let sample_hz = settings.sample_hz as f64;
         let Synth {
-            ref mode,
             ref oscillators,
             ref channels,
             ref mut voices,
@@ -487,11 +486,14 @@ impl<S> DspNode<S> for Synth where S: Sample {
         // Prepare a Vec to use for calculating the pan for each voice.
         let mut voice_amp_per_channel = amp_per_channel.clone();
 
+        // Is the given voice currently playing something.
+        fn is_active(voice: &Voice) -> bool { voice.maybe_note.is_some() }
+
         // The number of voices to consider when calculating the pan spread.
-        let num_voices = voices.len();
+        let num_voices = voices.iter().filter(|v| is_active(v)).count();
 
         // Request audio from each voice.
-        for (i, voice) in voices.iter_mut().enumerate() {
+        for (i, voice) in voices.iter_mut().filter(|v| is_active(v)).enumerate() {
 
             // A working buffer which we will fill using the Voice.
             let mut working: Vec<S> = vec![Sample::zero(); settings.buffer_size()];
@@ -504,17 +506,17 @@ impl<S> DspNode<S> for Synth where S: Sample {
                               loop_data_samples.as_ref(),
                               fade_data_samples.as_ref());
 
-            if let Mode::Mono(_, _) = *mode {
-                // If we have a stereo stream, calculate the spread.
-                if settings.channels == 2 && spread > 0.0 {
-                    // Calculate the Voice's pan in accordance with the spread.
-                    let pan = ((i as f32 / (num_voices-1) as f32) - 0.5) * (spread * 2.0);
-                    let panned = stereo::pan(pan);
+            // If we have a stereo stream, calculate the spread.
+            if settings.channels == 2 && spread > 0.0 {
+                let pan = match num_voices {
+                    1 => 0.0,
+                    _ => ((i as f32 / (num_voices-1) as f32) - 0.5) * (spread * 2.0),
+                };
+                let panned = stereo::pan(pan);
 
-                    // Multiply the pan result with the amp_per_channel to get the voice's amp.
-                    voice_amp_per_channel[0] = amp_per_channel[0] * panned[0];
-                    voice_amp_per_channel[1] = amp_per_channel[1] * panned[1];
-                }
+                // Multiply the pan result with the amp_per_channel to get the voice's amp.
+                voice_amp_per_channel[0] = amp_per_channel[0] * panned[0];
+                voice_amp_per_channel[1] = amp_per_channel[1] * panned[1];
             }
 
             Sample::add_buffers(output, &working, &voice_amp_per_channel);
