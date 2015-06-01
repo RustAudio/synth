@@ -11,6 +11,7 @@ use dsp::Node as DspNode;
 use dsp::Settings as DspSettings;
 use dsp::Sample;
 use oscillator::Oscillator;
+use panning::stereo;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
@@ -34,6 +35,8 @@ pub struct Synth {
     pub oscillators: Vec<Oscillator>,
     /// The mode of note playback.
     pub mode: Mode,
+    /// The amplitude for each channel.
+    pub channels: Vec<f32>,
     /// The voices used by the Synth.
     /// - If the Synth is in Poly mode, it will play one voice at a time.
     /// - If the Synth is in Mono mode, it will play all voices at once.
@@ -96,6 +99,7 @@ impl Synth {
         Synth {
             oscillators: Vec::new(),
             mode: Mode::Mono(Mono::Normal, empty_note_stack()),
+            channels: Vec::from(&stereo::centre()[..]),
             voices: vec![Voice::new(0)],
             detune: 0.0,
             spread: 0.0,
@@ -176,6 +180,29 @@ impl Synth {
         self
     }
 
+    /// Set the amplitude for each channel.
+    pub fn channels(mut self, channels: Vec<f32>) -> Synth {
+        self.channels = channels;
+        self
+    }
+
+    /// Set the amplitude of each channel according to a given stereo pan between -1.0 and 1.0.
+    /// If the given value is outside the range -1.0..1.0, it will be clamped to range.
+    /// The synth's number of channels will be set to two if it does not already have two.
+    pub fn stereo_pan(mut self, pan: f32) -> Synth {
+        let pan = if pan < -1.0 { -1.0 } else if pan > 1.0 { 1.0 } else { pan };
+        let len = self.channels.len();
+        if len > 2 {
+            self.channels.truncate(2);
+        } else if len < 2 {
+            self.channels.extend((len..2).map(|_| 1.0));
+        }
+        let panned = stereo::pan(pan);
+        self.channels[0] = panned[0];
+        self.channels[1] = panned[1];
+        self
+    }
+
     /// Set the Synth's base pitch.
     pub fn base_pitch(mut self, base_pitch: BasePitch) -> Synth {
         self.base_pitch = base_pitch;
@@ -185,6 +212,12 @@ impl Synth {
     /// Set the Synth's detune amount.
     pub fn detune(mut self, detune: f32) -> Synth {
         self.detune = detune;
+        self
+    }
+
+    /// Set the Synth's spread amount.
+    pub fn spread(mut self, spread: f32) -> Synth {
+        self.spread = spread;
         self
     }
 
@@ -281,7 +314,7 @@ impl Synth {
     pub fn note_on(&mut self, note_hz: NoteHz, note_velocity: NoteVelocity) {
         let Synth { base_pitch, detune, ref mut mode, ref mut voices, .. } = *self;
         let gen_note_freq_multi = || {
-            let step_offset = ::rand::random::<f32>() * detune - detune / 2.0;
+            let step_offset = ::rand::random::<f32>() * 2.0 * detune - detune;
             let note_hz = pitch::Step(pitch::Hz(note_hz).step() + step_offset).hz();
             note_hz as f64 / base_pitch as f64
         };
@@ -418,8 +451,11 @@ impl<S> DspNode<S> for Synth where S: Sample {
         if !self.is_active() { return }
         let sample_hz = settings.sample_hz as f64;
         let Synth {
+            ref mode,
             ref oscillators,
+            ref channels,
             ref mut voices,
+            spread,
             duration,
             vol,
             normaliser,
@@ -443,19 +479,45 @@ impl<S> DspNode<S> for Synth where S: Sample {
             (Ms(attack_ms).samples(sample_hz), Ms(release_ms).samples(sample_hz))
         });
 
-        let amp_multi = vol * normaliser;
-        let vol_per_channel = vec![amp_multi; settings.channels as usize];
+        // Determine the amplitude for each channel.
+        let amp_per_channel = (0..settings.channels as usize).zip(channels.iter()).map(|(_, amp)| {
+            *amp * vol* normaliser
+        }).collect::<Vec<_>>();
+
+        // Prepare a Vec to use for calculating the pan for each voice.
+        let mut voice_amp_per_channel = amp_per_channel.clone();
+
+        // The number of voices to consider when calculating the pan spread.
+        let num_voices = voices.len();
 
         // Request audio from each voice.
-        for voice in voices {
+        for (i, voice) in voices.iter_mut().enumerate() {
+
+            // A working buffer which we will fill using the Voice.
             let mut working: Vec<S> = vec![Sample::zero(); settings.buffer_size()];
+
+            // Fill the working buffer with the voice.
             voice.fill_buffer(&mut working,
                               settings,
                               oscillators,
                               duration,
                               loop_data_samples.as_ref(),
                               fade_data_samples.as_ref());
-            Sample::add_buffers(output, &working, &vol_per_channel);
+
+            if let Mode::Mono(_, _) = *mode {
+                // If we have a stereo stream, calculate the spread.
+                if settings.channels == 2 && spread > 0.0 {
+                    // Calculate the Voice's pan in accordance with the spread.
+                    let pan = ((i as f32 / (num_voices-1) as f32) - 0.5) * (spread * 2.0);
+                    let panned = stereo::pan(pan);
+
+                    // Multiply the pan result with the amp_per_channel to get the voice's amp.
+                    voice_amp_per_channel[0] = amp_per_channel[0] * panned[0];
+                    voice_amp_per_channel[1] = amp_per_channel[1] * panned[1];
+                }
+            }
+
+            Sample::add_buffers(output, &working, &voice_amp_per_channel);
         }
     }
 
