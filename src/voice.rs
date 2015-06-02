@@ -166,7 +166,7 @@ impl Voice {
             // Iterate the playhead. If the playhead passes the duration of the instrument or
             // the note that is currently being played, reset the playhead and stop playback.
             *playhead += 1;
-            if *playhead >= duration + release || *loop_playhead > duration {
+            if *loop_playhead > duration {
                 *maybe_note = None;
                 *playhead = 0;
             }

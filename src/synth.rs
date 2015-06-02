@@ -15,7 +15,7 @@ use panning::stereo;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
-use voice::{Voice, NoteFreqMulti, NoteHz, NoteState, NoteVelocity};
+use voice::{Voice, NoteHz, NoteState, NoteVelocity};
 
 
 pub type Duration = time::calc::Ms;
@@ -63,7 +63,7 @@ pub struct Synth {
 #[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
 pub enum Mode {
     /// Single voice (normal or legato) with a stack of fallback notes.
-    Mono(Mono, Vec<(NoteHz, NoteFreqMulti)>),
+    Mono(Mono, Vec<NoteHz>),
     /// Multiple voices.
     Poly,
 }
@@ -82,7 +82,7 @@ pub enum Mono {
 
 
 /// Construct an empty note stack for the Mono synth mode.
-pub fn empty_note_stack() -> Vec<(NoteHz, NoteFreqMulti)> {
+pub fn empty_note_stack() -> Vec<NoteHz> {
     Vec::with_capacity(16)
 }
 
@@ -304,15 +304,12 @@ impl Synth {
     #[inline]
     pub fn note_on(&mut self, note_hz: NoteHz, note_velocity: NoteVelocity) {
         let Synth { base_pitch, detune, ref mut mode, ref mut voices, .. } = *self;
-        let gen_note_freq_multi = || {
-            let step_offset = ::rand::random::<f32>() * 2.0 * detune - detune;
-            let note_hz = pitch::Step(pitch::Hz(note_hz).step() + step_offset).hz();
-            note_hz as f64 / base_pitch as f64
-        };
+        let gen_note_freq_multi = || gen_note_freq_multi(base_pitch, detune, note_hz);
         match *mode {
+
             Mode::Mono(mono, ref mut notes) => {
-                if let Some((NoteState::Playing, hz, freq_multi, _)) = voices[0].maybe_note.take() {
-                    notes.push((hz, freq_multi));
+                if let Some((NoteState::Playing, hz, _, _)) = voices[0].maybe_note.take() {
+                    notes.push(hz);
                 } else {
                     notes.clear();
                     for voice in voices.iter_mut() {
@@ -328,6 +325,7 @@ impl Synth {
                     voice.note_on(note_hz, gen_note_freq_multi(), note_velocity);
                 }
             },
+
             Mode::Poly => {
                 let mut oldest: Option<&mut Voice> = None;
                 let mut max_sample_count: i64 = 0;
@@ -347,31 +345,41 @@ impl Synth {
                     voice.note_on(note_hz, gen_note_freq_multi(), note_velocity);
                 }
             }
+
         }
     }
 
     /// Stop playback of the note that was triggered with the matching frequency.
     #[inline]
     pub fn note_off(&mut self, note_hz: NoteHz) {
+        const HZ_VARIANCE: NoteHz = 0.0001;
+        let (min_hz, max_hz) = (note_hz - HZ_VARIANCE, note_hz + HZ_VARIANCE);
+
+        // Does the given hz match the note_off hz.
+        let hz_match = |hz: NoteHz| hz > min_hz && hz < max_hz;
+
+        // Does the voice's currently playing note match the note_off given.
         let is_match = |voice: &Voice| match voice.maybe_note {
-            Some((NoteState::Playing, voice_note_hz, _, _)) => voice_note_hz == note_hz,
+            Some((NoteState::Playing, voice_note_hz, _, _)) => hz_match(voice_note_hz),
             _ => false,
         };
-        let Synth { ref mut mode, ref mut voices, .. } = *self;
+
+        let Synth { base_pitch, detune, ref mut mode, ref mut voices, .. } = *self;
         match *mode {
 
             // If the synth is in a monophonic mode.
             Mode::Mono(mono, ref mut notes) => {
                 if is_match(&mut voices[0]) {
                     if let Some((_, _, _, vel)) = voices[0].maybe_note {
-                        if let Some((old_hz, old_freq_multi)) = notes.pop() {
+                        if let Some(old_hz) = notes.pop() {
                             if let Mono::Normal = mono {
                                 for voice in voices.iter_mut() {
                                     voice.reset_playheads();
                                 }
                             }
                             for voice in voices.iter_mut() {
-                                voice.note_on(old_hz, old_freq_multi, vel);
+                                let freq_multi = gen_note_freq_multi(base_pitch, detune, old_hz);
+                                voice.note_on(old_hz, freq_multi, vel);
                             }
                             return;
                         }
@@ -380,9 +388,9 @@ impl Synth {
                         voice.note_off();
                     }
                 } else {
+                    // If any notes in the note stack match the given note_off, remove them.
                     for i in (0..notes.len()).rev() {
-                        let (hz, _) = notes[i];
-                        if hz == note_hz {
+                        if hz_match(notes[i]) {
                             notes.remove(i);
                         }
                     }
@@ -515,3 +523,10 @@ impl<S> DspNode<S> for Synth where S: Sample {
 
 }
 
+
+/// Generate a multiplier for a note's frequency.
+fn gen_note_freq_multi(base_pitch: f32, detune: f32, note_hz: f32) -> f64 {
+    let step_offset = ::rand::random::<f32>() * 2.0 * detune - detune;
+    let note_hz = pitch::Step(pitch::Hz(note_hz).step() + step_offset).hz();
+    note_hz as f64 / base_pitch as f64
+}
