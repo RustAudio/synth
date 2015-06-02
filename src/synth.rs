@@ -15,7 +15,7 @@ use panning::stereo;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
-use voice::{Voice, NoteHz, NoteState, NoteVelocity};
+use voice::{CurrentFreq, NoteHz, NoteState, NoteVelocity, Voice};
 
 
 pub type Duration = time::calc::Ms;
@@ -51,6 +51,8 @@ pub struct Synth {
     pub base_pitch: BasePitch,
     /// Amplitude multiplier (volume).
     pub volume: f32,
+    /// The duration at which it takes to drift from the current note to some new note.
+    pub portamento: f64,
     /// Data used for looping over a duration of the Synth.
     pub loop_data: Option<(LoopStart, LoopEnd)>,
     /// Data used for fading in / out from playback.
@@ -104,6 +106,7 @@ impl Synth {
             duration: MS_300,
             base_pitch: C_1,
             volume: 1.0,
+            portamento: 0.0,
             loop_data: None,
             fade_data: None,
             is_paused: false,
@@ -224,6 +227,12 @@ impl Synth {
         self
     }
 
+    /// Set the Synth's portamento duration in milliseconds.
+    pub fn portamento(mut self, portamento: f64) -> Synth {
+        self.portamento = portamento;
+        self
+    }
+
     /// Set the loop data for the synth.
     pub fn loop_points(mut self, start: LoopStart, end: LoopEnd) -> Synth {
         self.loop_data = Some((start, end));
@@ -303,11 +312,23 @@ impl Synth {
     /// play the new note instead.
     #[inline]
     pub fn note_on(&mut self, note_hz: NoteHz, note_velocity: NoteVelocity) {
-        let Synth { base_pitch, detune, ref mut mode, ref mut voices, .. } = *self;
-        let gen_note_freq_multi = || gen_note_freq_multi(base_pitch, detune, note_hz);
+        let Synth { detune, portamento, ref mut mode, ref mut voices, .. } = *self;
+
+        // Determine the starting frequency for the note.
+        let start_freq = |maybe_last_hz: Option<pitch::calc::Hz>| {
+            CurrentFreq::new(portamento, detune, note_hz, maybe_last_hz)
+        };
+
         match *mode {
 
             Mode::Mono(mono, ref mut notes) => {
+
+                // If some note is already playing, take it to use for portamento.
+                let maybe_last_hz = match voices[0].maybe_note.as_ref() {
+                    Some(&(NoteState::Playing, _, ref f, _)) => Some(f.hz()),
+                    _ => None,
+                };
+
                 if let Some((NoteState::Playing, hz, _, _)) = voices[0].maybe_note.take() {
                     notes.push(hz);
                 } else {
@@ -322,17 +343,36 @@ impl Synth {
                     }
                 }
                 for voice in voices.iter_mut() {
-                    voice.note_on(note_hz, gen_note_freq_multi(), note_velocity);
+                    voice.note_on(note_hz, start_freq(maybe_last_hz), note_velocity);
                 }
             },
 
             Mode::Poly => {
+
+                // Construct the new CurrentFreq for the new note.
+                let freq = {
+                    // First, determine the current hz of the last note played if there is one.
+                    let mut active = voices.iter().filter(|voice| voice.maybe_note.is_some());
+                    fn hz_and_playhead(voice: &Voice) -> (pitch::calc::Hz, Playhead) {
+                        let hz = voice.maybe_note.map(|(_, _, f, _)| f.hz()).unwrap();
+                        (hz, voice.playhead)
+                    }
+                    let maybe_last_hz = active.next().map(|voice| {
+                        active.fold(hz_and_playhead(voice), |(hz, playhead), voice| {
+                            if voice.playhead > playhead { hz_and_playhead(voice) }
+                            else { (hz, playhead) }
+                        })
+                    }).map(|(hz, _)| hz);
+                    start_freq(maybe_last_hz)
+                };
+
+                // Find the right voice to play the note.
                 let mut oldest: Option<&mut Voice> = None;
                 let mut max_sample_count: i64 = 0;
                 for voice in voices.iter_mut() {
                     if voice.maybe_note.is_none() {
                         voice.reset_playheads();
-                        voice.note_on(note_hz, gen_note_freq_multi(), note_velocity);
+                        voice.note_on(note_hz, freq, note_velocity);
                         return;
                     }
                     else if voice.playhead >= max_sample_count {
@@ -342,7 +382,7 @@ impl Synth {
                 }
                 if let Some(voice) = oldest {
                     voice.reset_playheads();
-                    voice.note_on(note_hz, gen_note_freq_multi(), note_velocity);
+                    voice.note_on(note_hz, freq, note_velocity);
                 }
             }
 
@@ -364,22 +404,30 @@ impl Synth {
             _ => false,
         };
 
-        let Synth { base_pitch, detune, ref mut mode, ref mut voices, .. } = *self;
+        let Synth { detune, portamento,  ref mut mode, ref mut voices, .. } = *self;
+
         match *mode {
 
             // If the synth is in a monophonic mode.
             Mode::Mono(mono, ref mut notes) => {
                 if is_match(&mut voices[0]) {
-                    if let Some((_, _, _, vel)) = voices[0].maybe_note {
+                    if let Some((_, _, last_freq, vel)) = voices[0].maybe_note {
+                        // If there's a note still on the stack, fall back to it.
                         if let Some(old_hz) = notes.pop() {
+
                             if let Mono::Normal = mono {
                                 for voice in voices.iter_mut() {
                                     voice.reset_playheads();
                                 }
                             }
+
+                            // Determine the new CurrentFreq for the fallback note.
+                            let hz = last_freq.hz();
+
+                            // Play the popped stack note on all voices.
                             for voice in voices.iter_mut() {
-                                let freq_multi = gen_note_freq_multi(base_pitch, detune, old_hz);
-                                voice.note_on(old_hz, freq_multi, vel);
+                                let freq = CurrentFreq::new(portamento, detune, old_hz, Some(hz));
+                                voice.note_on(old_hz, freq, vel);
                             }
                             return;
                         }
@@ -455,6 +503,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
             ref mut voices,
             spread,
             duration,
+            base_pitch,
             volume,
             ref loop_data,
             ref fade_data,
@@ -501,6 +550,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
                               settings,
                               oscillators,
                               duration,
+                              base_pitch,
                               loop_data_samples.as_ref(),
                               fade_data_samples.as_ref());
 
@@ -523,10 +573,3 @@ impl<S> DspNode<S> for Synth where S: Sample {
 
 }
 
-
-/// Generate a multiplier for a note's frequency.
-fn gen_note_freq_multi(base_pitch: f32, detune: f32, note_hz: f32) -> f64 {
-    let step_offset = ::rand::random::<f32>() * 2.0 * detune - detune;
-    let note_hz = pitch::Step(pitch::Hz(note_hz).step() + step_offset).hz();
-    note_hz as f64 / base_pitch as f64
-}
