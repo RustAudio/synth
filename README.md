@@ -11,6 +11,12 @@ Features
 - Polyphonic (unlimited number of voices).
 - Warbliness builder method that uses gaussian noise to model the "warped-old-hardware-synth" sound.
 - Trigger playback at any time by passing the synth notes `synth.play_note((duration_in_ms, pitch_in_hz))`. `Synth` will automatically find an idle `Voice` to use (or retrigger the oldest one).
+- Per-channel amplitude and a stereo panning helper method.
+- "Stereo spread" for automatically spreading multiple voices evenly across the stereo image.
+- Per-voice portamento.
+- Per-voice detuning.
+- Multi-voice (unison) Mono mode.
+- Legato and Retrigger Mono modes.
 - Uses [sound_stream](https://github.com/RustAudio/sound_stream) and its Sample trait and in turn is generic over any bit-depth or sample format.
 
 ```Rust

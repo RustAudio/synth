@@ -74,7 +74,7 @@ pub enum Mode {
 #[derive(Copy, Clone, Debug, RustcDecodable, RustcEncodable)]
 pub enum Mono {
     /// New notes will reset the voice's playheads
-    Normal,
+    Retrigger,
     /// If a note is already playing, new notes will not reset the voice's playheads.
     /// A stack of notes is kept - if a NoteOff occurs on the current note, it is replaced with the
     /// note at the top of the stack if there is one. The stacked notes are reset if the voice
@@ -98,7 +98,7 @@ impl Synth {
         const C_1: BasePitch = 32.703;
         Synth {
             oscillators: Vec::new(),
-            mode: Mode::Mono(Mono::Normal, empty_note_stack()),
+            mode: Mode::Mono(Mono::Retrigger, empty_note_stack()),
             channels: Vec::from(&stereo::centre()[..]),
             voices: vec![Voice::new(0)],
             detune: 0.0,
@@ -138,7 +138,7 @@ impl Synth {
     /// Turn legato on or off. If the Mode was originally Poly and legato was turned on, the Mode
     /// will become Mono(_, Legato).
     pub fn legato(mut self, on: bool) -> Synth {
-        let new_mono = || if on { Mono::Legato } else { Mono::Normal };
+        let new_mono = || if on { Mono::Legato } else { Mono::Retrigger };
         let is_poly = match self.mode {
             Mode::Mono(ref mut mono, _) => {
                 *mono = new_mono();
@@ -337,7 +337,7 @@ impl Synth {
                         voice.reset_playheads();
                     }
                 }
-                if let Mono::Normal = mono {
+                if let Mono::Retrigger = mono {
                     for voice in voices.iter_mut() {
                         voice.reset_playheads();
                     }
@@ -415,7 +415,7 @@ impl Synth {
                         // If there's a note still on the stack, fall back to it.
                         if let Some(old_hz) = notes.pop() {
 
-                            if let Mono::Normal = mono {
+                            if let Mono::Retrigger = mono {
                                 for voice in voices.iter_mut() {
                                     voice.reset_playheads();
                                 }
