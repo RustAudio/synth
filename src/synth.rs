@@ -392,7 +392,7 @@ impl Synth {
     /// Stop playback of the note that was triggered with the matching frequency.
     #[inline]
     pub fn note_off(&mut self, note_hz: NoteHz) {
-        const HZ_VARIANCE: NoteHz = 0.0001;
+        const HZ_VARIANCE: NoteHz = 0.25;
         let (min_hz, max_hz) = (note_hz - HZ_VARIANCE, note_hz + HZ_VARIANCE);
 
         // Does the given hz match the note_off hz.

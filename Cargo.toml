@@ -2,7 +2,7 @@
 
 name = "synth"
 description = "A polyphonic Synth type whose multiple oscillators generate sound via amplitude and frequency envelopes."
-version = "0.4.3"
+version = "0.4.4"
 authors = ["mitchmindtree <mitchell.nordine@gmail.com>"]
 readme = "README.md"
 keywords = ["synthesis", "dsp", "audio", "music", "instrument"]
