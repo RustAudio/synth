@@ -5,12 +5,18 @@ A polyphonic Synth type whose multiple oscillators generate sound via amplitude 
 Features
 --------
 
-- Sine, Saw, Square, Noise and NoiseWalk waveforms.
+- Sine, Saw, SawExp, Square, Noise and NoiseWalk waveforms.
 - Amplitude and frequency envelopes with an unlimited number of points.
 - Unlimited number of oscillators (each can have unique waveforms and amplitude and frequency envelopes).
-- Polyphonic (unlimited number of voices).
-- Warbliness builder method that uses gaussian noise to model the "warped-old-hardware-synth" sound.
-- Trigger playback at any time by passing the synth notes `synth.play_note((duration_in_ms, pitch_in_hz))`. `Synth` will automatically find an idle `Voice` to use (or retrigger the oldest one).
+- Monophonic and Polyphonic modes (unlimited number of voices).
+- Simple `note_on(pitch_in_hz, velocity)` and `note_off(pitch_in_hz)` methods.
+- Per-channel amplitude and a stereo panning helper method.
+- "Stereo spread" for automatically spreading multiple voices evenly across the stereo image.
+- Per-voice portamento.
+- Per-voice detuning.
+- Multi-voice (unison) support in Mono mode.
+- Legato and Retrigger Mono modes.
+- Warbliness Oscillator builder method that uses gaussian noise to model the "warped-old-hardware-synth" sound.
 - Uses [sound_stream](https://github.com/RustAudio/sound_stream) and its Sample trait and in turn is generic over any bit-depth or sample format.
 
 ```Rust
