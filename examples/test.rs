@@ -24,11 +24,11 @@ fn main() {
 
     // Construct our fancy Synth!
     let mut synth = {
-        use synth::{AmpEnvelope, FreqEnvelope, Point, Oscillator, Waveform};
+        use synth::{Point, Oscillator, mode, oscillator};
 
         // The following envelopes should create a downward pitching sine wave that gradually quietens.
         // Try messing around with the points and adding some of your own!
-        let amp_env = AmpEnvelope::from_points(vec!(
+        let amp_env = oscillator::AmpEnvelope::from_points(vec!(
             //         Time ,  Amp ,  Curve
             Point::new(0.0  ,  0.0 ,  0.0),
             Point::new(0.01 ,  1.0 ,  0.0),
@@ -36,7 +36,7 @@ fn main() {
             Point::new(0.81 ,  0.8 ,  0.0),
             Point::new(1.0  ,  0.0 ,  0.0),
         ));
-        let freq_env = FreqEnvelope::from_points(vec!(
+        let freq_env = oscillator::FreqEnvelope::from_points(vec!(
             //         Time    , Freq   , Curve
             Point::new(0.0     , 0.0    , 0.0),
             Point::new(0.00136 , 1.0    , 0.0),
@@ -48,20 +48,18 @@ fn main() {
         ));
 
         // Now we can create our oscillator from our envelopes.
-        let oscillator = Oscillator::new()
-            .waveform(Waveform::Saw) // There are also Sine, Noise, NoiseWalk, SawExp and Square waveforms.
-            .amplitude(amp_env)
-            .frequency(freq_env);
+        // There are also Sine, Noise, NoiseWalk, SawExp and Square waveforms.
+        let oscillator = Oscillator::new(oscillator::waveform::Square, amp_env, freq_env, ());
 
         // Here we construct our Synth from our oscillator.
-        Synth::new()
+        Synth::new(mode::Mono::retrigger(), ())
             .oscillator(oscillator) // Add as many different oscillators as desired.
             .duration(6000.0) // Milliseconds.
             .base_pitch(LetterOctave(Letter::C, 1).hz()) // Hz.
             .loop_points(0.49, 0.51) // Loop start and end points.
             .fade(500.0, 500.0) // Attack and Release in milliseconds.
             .num_voices(16) // By default Synth is monophonic but this gives it `n` voice polyphony.
-            .volume(0.10)
+            .volume(0.20)
             .detune(0.5)
             .spread(1.0)
 
@@ -70,20 +68,19 @@ fn main() {
             // .loop_end(1.0)
             // .attack(ms)
             // .release(ms)
+            // .note_freq_generator(nfg)
             // .oscillators([oscA, oscB, oscC])
             // .volume(1.0)
-            // .normaliser(1.0)
     };
 
     // Construct a note for the synth to perform. Have a play around with the pitch and duration!
     let note_hz = LetterOctave(Letter::C, 1).hz();
     let note_velocity = 1.0;
-    println!("note_on");
     synth.note_on(note_hz, note_velocity);
 
     // We'll call this to release the note after 4 seconds.
-    let release_time = 4.0;
-    let mut maybe_note_off = Some(move |synth: &mut Synth| synth.note_off(note_hz));
+    let note_duration = 4.0;
+    let mut is_note_off = false;
 
     // We'll use this to keep track of time and break from the loop after 6 seconds.
     let mut timer: f64 = 0.0;
@@ -94,10 +91,11 @@ fn main() {
         synth.audio_requested(output, settings);
         if timer < 6.0 {
             timer += dt;
-            if timer > release_time {
-                if let Some(note_off) = maybe_note_off.take() {
-                    println!("note_off");
-                    note_off(&mut synth);
+            // Once the timer exceeds our note duration, send the note_off.
+            if timer > note_duration {
+                if !is_note_off {
+                    synth.note_off(note_hz);
+                    is_note_off = true;
                 }
             }
             CallbackResult::Continue

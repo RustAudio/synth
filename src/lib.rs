@@ -12,15 +12,18 @@ extern crate rand;
 extern crate rustc_serialize;
 extern crate utils;
 
+pub use dynamic::Synth as Dynamic;
 pub use env_point::Point;
-pub use oscillator::{AmpEnvelope, FreqEnvelope, Oscillator};
-pub use synth::{empty_note_stack, Mode, Mono, Synth};
+pub use note_freq::{NoteFreqGenerator, NoteFreq, Portamento, PortamentoFreq};
+pub use oscillator::{AmpEnvelope, FreqEnvelope, Oscillator, Waveform};
+pub use synth::Synth;
 pub use voice::Voice;
-pub use waveform::Waveform;
 
+pub mod dynamic;
 mod env_point;
-mod oscillator;
-pub mod synth;
-pub mod voice;
-pub mod waveform;
+pub mod mode;
+pub mod note_freq;
+pub mod oscillator;
+mod synth;
+mod voice;
 

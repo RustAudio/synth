@@ -10,12 +10,14 @@
 use dsp::Node as DspNode;
 use dsp::Settings as DspSettings;
 use dsp::Sample;
-use oscillator::Oscillator;
+use mode::Mode;
+use oscillator::{self, FreqWarp, Oscillator};
+use note_freq::{NoteFreq, NoteFreqGenerator};
 use panning::stereo;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
-use voice::{CurrentFreq, NoteHz, NoteState, NoteVelocity, Voice};
+use voice::{NoteHz, NoteVelocity, OscillatorState, Voice};
 
 
 pub type Duration = time::calc::Ms;
@@ -30,17 +32,17 @@ pub type Playhead = time::calc::Samples;
 /// while a `Voice` generates audio via a vector of
 /// `Oscillator`s, creating a small DSP tree.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
-pub struct Synth {
+pub struct Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerator {
     /// Oscillators for playback.
-    pub oscillators: Vec<Oscillator>,
+    pub oscillators: Vec<Oscillator<W, A, F, FW>>,
     /// The mode of note playback.
-    pub mode: Mode,
+    pub mode: M,
     /// The amplitude for each channel.
     pub channels: Vec<f32>,
     /// The voices used by the Synth.
     /// - If the Synth is in Poly mode, it will play one voice at a time.
     /// - If the Synth is in Mono mode, it will play all voices at once.
-    pub voices: Vec<Voice>,
+    pub voices: Vec<Voice<NFG::NoteFreq>>,
     /// The amount each voice's note_on should be detuned.
     pub detune: f32,
     /// The amount each voice should be spread across the available channels.
@@ -52,7 +54,7 @@ pub struct Synth {
     /// Amplitude multiplier (volume).
     pub volume: f32,
     /// The duration at which it takes to drift from the current note to some new note.
-    pub portamento: f64,
+    pub note_freq_gen: NFG,
     /// Data used for looping over a duration of the Synth.
     pub loop_data: Option<(LoopStart, LoopEnd)>,
     /// Data used for fading in / out from playback.
@@ -61,44 +63,17 @@ pub struct Synth {
     pub is_paused: bool,
 }
 
-/// The mode in which the Synth will handle notes.
-#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
-pub enum Mode {
-    /// Single voice (normal or legato) with a stack of fallback notes.
-    Mono(Mono, Vec<NoteHz>),
-    /// Multiple voices.
-    Poly,
-}
 
-/// The state of monophony.
-#[derive(Copy, Clone, Debug, RustcDecodable, RustcEncodable)]
-pub enum Mono {
-    /// New notes will reset the voice's playheads
-    Retrigger,
-    /// If a note is already playing, new notes will not reset the voice's playheads.
-    /// A stack of notes is kept - if a NoteOff occurs on the current note, it is replaced with the
-    /// note at the top of the stack if there is one. The stacked notes are reset if the voice
-    /// becomes inactive.
-    Legato,
-}
-
-
-/// Construct an empty note stack for the Mono synth mode.
-pub fn empty_note_stack() -> Vec<NoteHz> {
-    Vec::with_capacity(16)
-}
-
-
-impl Synth {
+impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerator {
 
     /// Constructor for a new Synth.
     #[inline]
-    pub fn new() -> Synth {
+    pub fn new(mode: M, note_freq_gen: NFG) -> Synth<M, NFG, W, A, F, FW> {
         const MS_300: Duration = 300.0;
         const C_1: BasePitch = 32.703;
         Synth {
             oscillators: Vec::new(),
-            mode: Mode::Mono(Mono::Retrigger, empty_note_stack()),
+            mode: mode,
             channels: Vec::from(&stereo::centre()[..]),
             voices: vec![Voice::new(0)],
             detune: 0.0,
@@ -106,82 +81,101 @@ impl Synth {
             duration: MS_300,
             base_pitch: C_1,
             volume: 1.0,
-            portamento: 0.0,
+            note_freq_gen: note_freq_gen,
             loop_data: None,
             fade_data: None,
             is_paused: false,
         }
     }
 
-    /// Set the number of voices that the Synth shall use.
-    /// If there are no voices, a default voice will be constructed.
+    /// Return the synth with the given number of voices.
     #[inline]
-    pub fn num_voices(mut self, num_voices: usize) -> Synth {
+    pub fn num_voices(mut self, num_voices: usize) -> Synth<M, NFG, W, A, F, FW> {
+        self.set_num_voices(num_voices);
+        self
+    }
+
+    /// Set the number of voices that the Synth shall use.
+    #[inline]
+    pub fn set_num_voices(&mut self, num_voices: usize) {
         if num_voices == 0 {
             println!("A Synth must have at least one voice, but the requested number is 0.");
-            self
         } else {
             let len = self.voices.len();
-            if num_voices == len {
-                self
-            } else if len < num_voices {
+            if len < num_voices {
                 let last_voice = self.voices[len-1].clone();
                 self.voices.extend(repeat(last_voice).take(num_voices - len));
-                self
-            } else {
+            } else if len > num_voices {
                 self.voices.truncate(num_voices);
-                self
             }
         }
     }
 
-    /// Turn legato on or off. If the Mode was originally Poly and legato was turned on, the Mode
-    /// will become Mono(_, Legato).
-    pub fn legato(mut self, on: bool) -> Synth {
-        let new_mono = || if on { Mono::Legato } else { Mono::Retrigger };
-        let is_poly = match self.mode {
-            Mode::Mono(ref mut mono, _) => {
-                *mono = new_mono();
-                false
-            },
-            Mode::Poly => true,
-        };
-        if is_poly {
-            self.mode = Mode::Mono(new_mono(), empty_note_stack());
+    /// Changes the mode of the Synth.
+    #[inline]
+    pub fn mode<NewM>(self, new_mode: NewM) -> Synth<NewM, NFG, W, A, F, FW> {
+        let Synth {
+            oscillators,
+            channels,
+            voices,
+            detune,
+            spread,
+            duration,
+            base_pitch,
+            volume,
+            note_freq_gen,
+            loop_data,
+            fade_data,
+            is_paused,
+            ..
+        } = self;
+        Synth {
+            oscillators: oscillators,
+            mode: new_mode,
+            channels: channels,
+            voices: voices,
+            detune: detune,
+            spread: spread,
+            duration: duration,
+            base_pitch: base_pitch,
+            volume: volume,
+            note_freq_gen: note_freq_gen,
+            loop_data: loop_data,
+            fade_data: fade_data,
+            is_paused: is_paused,
         }
-        self
     }
 
     /// Add an oscillator to a Synth.
     #[inline]
-    pub fn oscillator(mut self, oscillator: Oscillator) -> Synth {
-        self.oscillators.push(oscillator);
-        for voice in self.voices.iter_mut() {
-            voice.oscillator_phases.push(0.0);
-        }
+    pub fn oscillator(mut self, oscillator: Oscillator<W, A, F, FW>) -> Synth<M, NFG, W, A, F, FW> {
+        self.add_oscillator(oscillator);
         self
     }
 
     /// Add multiple oscillators to a Synth.
     #[inline]
-    pub fn oscillators<I: Iterator<Item=Oscillator>>(mut self, oscillators: I) -> Synth {
+    pub fn oscillators<I: Iterator<Item=Oscillator<W, A, F, FW>>>
+    (mut self, oscillators: I)
+    -> Synth<M, NFG, W, A, F, FW>
+    {
         let len = self.oscillators.len();
         self.oscillators.extend(oscillators);
         let target_len = self.oscillators.len();
         for voice in self.voices.iter_mut() {
-            voice.oscillator_phases.extend((len..target_len).map(|_| 0.0));
+            voice.oscillator_states.extend((len..target_len).map(|_| OscillatorState::new()));
         }
         self
     }
 
     /// Set the Synth's duration.
-    pub fn duration(mut self, duration: Duration) -> Synth {
+    pub fn duration(mut self, duration: Duration) -> Synth<M, NFG, W, A, F, FW> {
         self.duration = duration;
         self
     }
 
     /// Set the amplitude for each channel.
-    pub fn channels(mut self, channels: Vec<f32>) -> Synth {
+    pub fn channels(mut self, channels: Vec<f32>) -> Synth<M, NFG, W, A, F, FW> {
         self.channels = channels;
         self
     }
@@ -189,7 +183,7 @@ impl Synth {
     /// Set the amplitude of each channel according to a given stereo pan between -1.0 and 1.0.
     /// If the given value is outside the range -1.0..1.0, it will be clamped to range.
     /// The synth's number of channels will be set to two if it does not already have two.
-    pub fn stereo_pan(mut self, pan: f32) -> Synth {
+    pub fn stereo_pan(mut self, pan: f32) -> Synth<M, NFG, W, A, F, FW> {
         let pan = if pan < -1.0 { -1.0 } else if pan > 1.0 { 1.0 } else { pan };
         let len = self.channels.len();
         if len > 2 {
@@ -204,49 +198,94 @@ impl Synth {
     }
 
     /// Set the Synth's base pitch.
-    pub fn base_pitch(mut self, base_pitch: BasePitch) -> Synth {
+    pub fn base_pitch(mut self, base_pitch: BasePitch) -> Synth<M, NFG, W, A, F, FW> {
         self.base_pitch = base_pitch;
         self
     }
 
     /// Set the Synth's detune amount.
-    pub fn detune(mut self, detune: f32) -> Synth {
+    pub fn detune(mut self, detune: f32) -> Synth<M, NFG, W, A, F, FW> {
         self.detune = detune;
         self
     }
 
     /// Set the Synth's spread amount.
-    pub fn spread(mut self, spread: f32) -> Synth {
+    pub fn spread(mut self, spread: f32) -> Synth<M, NFG, W, A, F, FW> {
         self.spread = spread;
         self
     }
 
     /// Set the Synth's volume.
-    pub fn volume(mut self, vol: f32) -> Synth {
+    pub fn volume(mut self, vol: f32) -> Synth<M, NFG, W, A, F, FW> {
         self.volume = vol;
         self
     }
 
     /// Set the Synth's portamento duration in milliseconds.
-    pub fn portamento(mut self, portamento: f64) -> Synth {
-        self.portamento = portamento;
-        self
+    pub fn note_freq_generator<NewNFG>(self, generator: NewNFG) -> Synth<M, NewNFG, W, A, F, FW>
+        where NewNFG: NoteFreqGenerator,
+    {
+        let Synth {
+            oscillators,
+            mode,
+            channels,
+            voices,
+            detune,
+            spread,
+            duration,
+            base_pitch,
+            volume,
+            loop_data,
+            fade_data,
+            is_paused,
+            ..
+        } = self;
+
+        let voices = voices.into_iter().map(|voice| {
+            let Voice { oscillator_states, maybe_note, playhead, loop_playhead } = voice;
+            let maybe_note = maybe_note.map(|(state, hz, _, vel)| {
+                let note_freq = generator.generate(hz, detune, None);
+                (state, hz, note_freq, vel)
+            });
+            Voice {
+                oscillator_states: oscillator_states,
+                maybe_note: maybe_note,
+                playhead: playhead,
+                loop_playhead: loop_playhead,
+            }
+        }).collect();
+
+        Synth {
+            oscillators: oscillators,
+            mode: mode,
+            channels: channels,
+            voices: voices,
+            detune: detune,
+            spread: spread,
+            duration: duration,
+            base_pitch: base_pitch,
+            volume: volume,
+            note_freq_gen: generator,
+            loop_data: loop_data,
+            fade_data: fade_data,
+            is_paused: is_paused,
+        }
     }
 
     /// Set the loop data for the synth.
-    pub fn loop_points(mut self, start: LoopStart, end: LoopEnd) -> Synth {
+    pub fn loop_points(mut self, start: LoopStart, end: LoopEnd) -> Synth<M, NFG, W, A, F, FW> {
         self.loop_data = Some((start, end));
         self
     }
 
     /// Set the fade data for the synth.
-    pub fn fade(mut self, attack: Attack, release: Release) -> Synth {
+    pub fn fade(mut self, attack: Attack, release: Release) -> Synth<M, NFG, W, A, F, FW> {
         self.fade_data = Some((attack, release));
         self
     }
 
     /// Set the start loop point.
-    pub fn loop_start(mut self, start: LoopStart) -> Synth {
+    pub fn loop_start(mut self, start: LoopStart) -> Synth<M, NFG, W, A, F, FW> {
         let loop_data = match self.loop_data {
             Some((_, end)) => Some((start, end)),
             None => Some((start, 1.0))
@@ -256,7 +295,7 @@ impl Synth {
     }
 
     /// Set the end loop point.
-    pub fn loop_end(mut self, end: LoopEnd) -> Synth {
+    pub fn loop_end(mut self, end: LoopEnd) -> Synth<M, NFG, W, A, F, FW> {
         let loop_data = match self.loop_data {
             Some((start, _)) => Some((start, end)),
             None => Some((0.0, end))
@@ -266,7 +305,7 @@ impl Synth {
     }
 
     /// Set the attack.
-    pub fn attack(mut self, attack: Attack) -> Synth {
+    pub fn attack(mut self, attack: Attack) -> Synth<M, NFG, W, A, F, FW> {
         let fade_data = match self.fade_data {
             Some((_, release)) => Some((attack, release)),
             None => Some((attack, 0.0))
@@ -276,7 +315,7 @@ impl Synth {
     }
 
     /// Set the release.
-    pub fn release(mut self, release: Release) -> Synth {
+    pub fn release(mut self, release: Release) -> Synth<M, NFG, W, A, F, FW> {
         let fade_data = match self.fade_data {
             Some((attack, _)) => Some((attack, release)),
             None => Some((0.0, release))
@@ -286,17 +325,17 @@ impl Synth {
     }
 
     /// Add an oscillator.
-    pub fn add_oscillator(&mut self, oscillator: Oscillator) {
+    pub fn add_oscillator(&mut self, oscillator: Oscillator<W, A, F, FW>) {
         self.oscillators.push(oscillator);
         for voice in self.voices.iter_mut() {
-            voice.oscillator_phases.push(0.0);
+            voice.oscillator_states.push(OscillatorState::new());
         }
     }
 
     /// Remove and return the oscillator at the given idx.
-    pub fn remove_oscillator(&mut self, idx: usize) -> Oscillator {
+    pub fn remove_oscillator(&mut self, idx: usize) -> Oscillator<W, A, F, FW> {
         for voice in self.voices.iter_mut() {
-            voice.oscillator_phases.remove(idx);
+            voice.oscillator_states.remove(idx);
         }
         self.oscillators.remove(idx)
     }
@@ -311,159 +350,16 @@ impl Synth {
     /// If no `Voice`s are free, the one playing the oldest note will be chosen to
     /// play the new note instead.
     #[inline]
-    pub fn note_on(&mut self, note_hz: NoteHz, note_velocity: NoteVelocity) {
-        let Synth { detune, portamento, ref mut mode, ref mut voices, .. } = *self;
-
-        // Determine the starting frequency for the note.
-        let start_freq = |maybe_last_hz: Option<pitch::calc::Hz>| {
-            CurrentFreq::new(portamento, detune, note_hz, maybe_last_hz)
-        };
-
-        match *mode {
-
-            Mode::Mono(mono, ref mut notes) => {
-
-                // If some note is already playing, take it to use for portamento.
-                let maybe_last_hz = match voices[0].maybe_note.as_ref() {
-                    Some(&(NoteState::Playing, _, ref f, _)) => Some(f.hz()),
-                    _ => None,
-                };
-
-                if let Some((NoteState::Playing, hz, _, _)) = voices[0].maybe_note.take() {
-                    notes.push(hz);
-                } else {
-                    notes.clear();
-                    for voice in voices.iter_mut() {
-                        voice.reset_playheads();
-                    }
-                }
-                if let Mono::Retrigger = mono {
-                    for voice in voices.iter_mut() {
-                        voice.reset_playheads();
-                    }
-                }
-                for voice in voices.iter_mut() {
-                    voice.note_on(note_hz, start_freq(maybe_last_hz), note_velocity);
-                }
-            },
-
-            Mode::Poly => {
-
-                // Construct the new CurrentFreq for the new note.
-                let freq = {
-                    // First, determine the current hz of the last note played if there is one.
-                    let mut active = voices.iter().filter(|voice| voice.maybe_note.is_some());
-                    fn hz_and_playhead(voice: &Voice) -> (pitch::calc::Hz, Playhead) {
-                        let hz = voice.maybe_note.map(|(_, _, f, _)| f.hz()).unwrap();
-                        (hz, voice.playhead)
-                    }
-                    let maybe_last_hz = active.next().map(|voice| {
-                        active.fold(hz_and_playhead(voice), |(hz, playhead), voice| {
-                            if voice.playhead > playhead { hz_and_playhead(voice) }
-                            else { (hz, playhead) }
-                        })
-                    }).map(|(hz, _)| hz);
-                    start_freq(maybe_last_hz)
-                };
-
-                // Find the right voice to play the note.
-                let mut oldest: Option<&mut Voice> = None;
-                let mut max_sample_count: i64 = 0;
-                for voice in voices.iter_mut() {
-                    if voice.maybe_note.is_none() {
-                        voice.reset_playheads();
-                        voice.note_on(note_hz, freq, note_velocity);
-                        return;
-                    }
-                    else if voice.playhead >= max_sample_count {
-                        max_sample_count = voice.playhead;
-                        oldest = Some(voice);
-                    }
-                }
-                if let Some(voice) = oldest {
-                    voice.reset_playheads();
-                    voice.note_on(note_hz, freq, note_velocity);
-                }
-            }
-
-        }
+    pub fn note_on(&mut self, note_hz: NoteHz, note_vel: NoteVelocity) where M: Mode {
+        let Synth { detune, ref note_freq_gen, ref mut mode, ref mut voices, .. } = *self;
+        mode.note_on(note_hz, note_vel, detune, note_freq_gen, voices);
     }
 
     /// Stop playback of the note that was triggered with the matching frequency.
     #[inline]
-    pub fn note_off(&mut self, note_hz: NoteHz) {
-        const HZ_VARIANCE: NoteHz = 0.25;
-        let (min_hz, max_hz) = (note_hz - HZ_VARIANCE, note_hz + HZ_VARIANCE);
-
-        // Does the given hz match the note_off hz.
-        let hz_match = |hz: NoteHz| hz > min_hz && hz < max_hz;
-
-        // Does the voice's currently playing note match the note_off given.
-        let is_match = |voice: &Voice| match voice.maybe_note {
-            Some((NoteState::Playing, voice_note_hz, _, _)) => hz_match(voice_note_hz),
-            _ => false,
-        };
-
-        let Synth { detune, portamento,  ref mut mode, ref mut voices, .. } = *self;
-
-        match *mode {
-
-            // If the synth is in a monophonic mode.
-            Mode::Mono(mono, ref mut notes) => {
-                if is_match(&mut voices[0]) {
-                    if let Some((_, _, last_freq, vel)) = voices[0].maybe_note {
-                        // If there's a note still on the stack, fall back to it.
-                        if let Some(old_hz) = notes.pop() {
-
-                            if let Mono::Retrigger = mono {
-                                for voice in voices.iter_mut() {
-                                    voice.reset_playheads();
-                                }
-                            }
-
-                            // Determine the new CurrentFreq for the fallback note.
-                            let hz = last_freq.hz();
-
-                            // Play the popped stack note on all voices.
-                            for voice in voices.iter_mut() {
-                                let freq = CurrentFreq::new(portamento, detune, old_hz, Some(hz));
-                                voice.note_on(old_hz, freq, vel);
-                            }
-                            return;
-                        }
-                    }
-                    for voice in voices.iter_mut() {
-                        voice.note_off();
-                    }
-                } else {
-                    // If any notes in the note stack match the given note_off, remove them.
-                    for i in (0..notes.len()).rev() {
-                        if hz_match(notes[i]) {
-                            notes.remove(i);
-                        }
-                    }
-                }
-            },
-
-            // If the synth is in a polyphonic mode.
-            Mode::Poly => {
-                let maybe_voice = voices.iter_mut().fold(None, |maybe_current_match, voice| {
-                    if is_match(voice) {
-                        match maybe_current_match {
-                            None => return Some(voice),
-                            Some(ref current_match) => if voice.playhead >= current_match.playhead {
-                                return Some(voice)
-                            },
-                        }
-                    }
-                    maybe_current_match
-                });
-                if let Some(voice) = maybe_voice {
-                    voice.note_off();
-                }
-            },
-
-        }
+    pub fn note_off(&mut self, note_hz: NoteHz) where M: Mode {
+        let Synth { detune, ref note_freq_gen,  ref mut mode, ref mut voices, .. } = *self;
+        mode.note_off(note_hz, detune, note_freq_gen, voices);
     }
 
     /// Pause playback.
@@ -480,10 +376,8 @@ impl Synth {
 
     /// Stop playback and clear the current notes.
     #[inline]
-    pub fn stop(&mut self) {
-        if let Mode::Mono(_, ref mut notes) = self.mode {
-            notes.clear();
-        }
+    pub fn stop(&mut self) where M: Mode {
+        self.mode.stop();
         for voice in self.voices.iter_mut() {
             voice.stop();
         }
@@ -491,7 +385,14 @@ impl Synth {
 
 }
 
-impl<S> DspNode<S> for Synth where S: Sample {
+impl<S, M, NFG, W, A, F, FW> DspNode<S> for Synth<M, NFG, W, A, F, FW> where
+    S: Sample,
+    NFG: NoteFreqGenerator,
+    W: oscillator::Waveform,
+    A: oscillator::Amplitude,
+    F: oscillator::Frequency,
+    FW: FreqWarp,
+{
 
     #[inline]
     fn audio_requested(&mut self, output: &mut [S], settings: DspSettings) {
@@ -534,7 +435,7 @@ impl<S> DspNode<S> for Synth where S: Sample {
         let mut voice_amp_per_channel = amp_per_channel.clone();
 
         // Is the given voice currently playing something.
-        fn is_active(voice: &Voice) -> bool { voice.maybe_note.is_some() }
+        fn is_active<NF>(voice: &Voice<NF>) -> bool { voice.maybe_note.is_some() }
 
         // The number of voices to consider when calculating the pan spread.
         let num_voices = voices.iter().filter(|v| is_active(v)).count();
