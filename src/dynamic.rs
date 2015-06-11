@@ -6,7 +6,10 @@ use mode;
 use note_freq;
 use synth;
 
-pub use self::oscillator::Oscillator;
+pub use mode::Dynamic as Mode;
+pub use note_freq::Dynamic as NoteFreqGenerator;
+
+pub use self::oscillator::{Oscillator, Waveform, Amplitude, Frequency, FreqWarp};
 pub use self::oscillator::new as new_oscillator;
 
 
@@ -38,12 +41,6 @@ pub type SynthType = synth::Synth<mode::Dynamic,
                                   oscillator::Amplitude,
                                   oscillator::Frequency,
                                   oscillator::FreqWarp>;
-
-/// An alias for a completely dynamic synth mode.
-pub type Mode = mode::Dynamic;
-
-/// An alias for a completely dynamic note freq generator.
-pub type NoteFreqGenerator = note_freq::DynamicGenerator;
 
 /// A wrapper for extending the functionality of a completely dynamic Synth.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
