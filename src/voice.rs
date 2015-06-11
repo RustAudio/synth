@@ -7,7 +7,8 @@
 
 use dsp::Settings as DspSettings;
 use dsp::{Sample};
-use oscillator::Oscillator;
+use oscillator::{Amplitude, Frequency, FreqWarp, Oscillator, Waveform};
+use note_freq::NoteFreq;
 use pitch::{self, Hz};
 use time::{self, Samples};
 
@@ -26,15 +27,24 @@ pub type NoteVelocity = f32;
 /// A single Voice. A Synth may consist
 /// of any number of Voices.
 #[derive(Clone, Debug, RustcEncodable, RustcDecodable)]
-pub struct Voice {
+pub struct Voice<NF> {
     /// The current phase for each oscillator owned by the Synth.
-    pub oscillator_phases: Vec<f64>,
+    pub oscillator_states: Vec<OscillatorState>,
     /// Data for a note, if there is one currently being played.
-    pub maybe_note: Option<(NoteState, NoteHz, CurrentFreq, NoteVelocity)>,
+    pub maybe_note: Option<(NoteState, NoteHz, NF, NoteVelocity)>,
     /// Playhead over the current note.
     pub playhead: Playhead,
     /// Playhead over the loop duration.
     pub loop_playhead: LoopPlayhead,
+}
+
+/// The state of an Oscillator that is unique to each voice playing it.
+#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+pub struct OscillatorState {
+    /// The Oscillator's current phase.
+    pub phase: f64,
+    /// The phase of the FreqWarp used to warp the oscillator's frequency.
+    pub freq_warp_phase: f64,
 }
 
 /// The current state of the Voice's note playback.
@@ -46,65 +56,26 @@ pub enum NoteState {
     Released(Playhead),
 }
 
-/// The Voice's currently playing frequency.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
-pub enum CurrentFreq {
-    /// The frequency is currently sliding due to some portamento.
-    Portamento(time::calc::Ms, pitch::calc::Mel, time::calc::Ms, pitch::calc::Mel),
-    /// We have a constant frequency and the note multiplier has already been calculated.
-    Constant(NoteHz),
+
+impl OscillatorState {
+    pub fn new() -> OscillatorState {
+        OscillatorState {
+            phase: 0.0,
+            freq_warp_phase: 0.0,
+        }
+    }
 }
 
 
-impl CurrentFreq {
-
-    /// Construct a new CurrentFreq considering portamento and detuning.
-    pub fn new(portamento: f64,
-               detune: f32,
-               note_hz: NoteHz,
-               maybe_last_hz: Option<pitch::calc::Hz>) -> CurrentFreq {
-
-        // If some detune was given, slightly detune the note_hz.
-        let target_hz = if detune > 0.0 {
-            let step_offset = ::rand::random::<f32>() * 2.0 * detune - detune;
-            pitch::Step(Hz(note_hz).step() + step_offset).hz()
-        // Otherwise, our target_hz is the given note_hz.
-        } else {
-            note_hz
-        };
-
-        match (portamento > 0.0, maybe_last_hz) {
-            // If we have some portamento and a note to slide from, create a Portamento.
-            (true, Some(hz)) =>
-                CurrentFreq::Portamento(0.0, Hz(hz).mel(), portamento, Hz(target_hz).mel()),
-            // Otherwise, we have a constant frequency.
-            _ => CurrentFreq::Constant(target_hz),
-        }
-    }
-
-    /// Calculate the hz given the state of the CurrentFreq.
-    pub fn hz(&self) -> pitch::calc::Hz {
-        match *self {
-            CurrentFreq::Portamento(count_ms, start_mel, duration_ms, target_mel) => {
-                let perc = count_ms as f64 / duration_ms as f64;
-                let diff_mel = target_mel - start_mel;
-                let perc_diff_mel = perc * diff_mel as f64;
-                let mel = start_mel + perc_diff_mel as pitch::calc::Mel;
-                pitch::Mel(mel).hz()
-            },
-            CurrentFreq::Constant(note_hz) => note_hz,
-        }
-    }
-
-}
-
-
-impl Voice {
+impl<NF> Voice<NF> {
 
     /// Constructor for a Voice.
-    pub fn new(num_oscillators: usize) -> Voice {
+    pub fn new(num_oscillators: usize) -> Voice<NF> {
         Voice {
-            oscillator_phases: (0..num_oscillators).map(|_| 0.0).collect(),
+            oscillator_states: (0..num_oscillators).map(|_| OscillatorState {
+                phase: 0.0,
+                freq_warp_phase: 0.0,
+            }).collect(),
             maybe_note: None,
             playhead: 0,
             loop_playhead: 0,
@@ -120,20 +91,25 @@ impl Voice {
 
     /// Trigger playback with the given note, resetting all playheads.
     #[inline]
-    pub fn note_on(&mut self, hz: NoteHz, freq: CurrentFreq, vel: NoteVelocity) {
+    pub fn note_on(&mut self, hz: NoteHz, freq: NF, vel: NoteVelocity) {
         self.maybe_note = Some((NoteState::Playing, hz, freq, vel));
     }
 
     /// Release playback of the current not eif there is one.
     #[inline]
     pub fn note_off(&mut self) {
-        self.maybe_note = self.maybe_note.map(|(_, h, m, v)| (NoteState::Released(0), h, m, v));
+        if let Some(&mut(ref mut state, _, _, _)) = self.maybe_note.as_mut() {
+            *state = NoteState::Released(0);
+        }
     }
 
     /// Stop playback of the current note if there is one and reset the playheads.
     #[inline]
     pub fn stop(&mut self) {
-        for phase in self.oscillator_phases.iter_mut() { *phase = 0.0; }
+        for osc_state in self.oscillator_states.iter_mut() {
+            osc_state.phase = 0.0;
+            osc_state.freq_warp_phase = 0.0;
+        }
         self.maybe_note = None;
         self.playhead = 0;
         self.loop_playhead = 0;
@@ -141,68 +117,75 @@ impl Voice {
 
     /// Generate and fill the audio buffer for the given parameters.
     #[inline]
-    pub fn fill_buffer<S>(&mut self,
-                          output: &mut [S],
-                          settings: DspSettings,
-                          oscillators: &[Oscillator],
-                          duration: time::calc::Samples,
-                          base_pitch: pitch::calc::Hz,
-                          loop_data: Option<&(LoopStart, LoopEnd)>,
-                          fade_data: Option<&(Attack, Release)>)
-        where S: Sample
+    pub fn fill_buffer<S, W, A, F, FW>(&mut self,
+                                       output: &mut [S],
+                                       settings: DspSettings,
+                                       oscillators: &[Oscillator<W, A, F, FW>],
+                                       duration: time::calc::Samples,
+                                       base_pitch: pitch::calc::Hz,
+                                       loop_data: Option<&(LoopStart, LoopEnd)>,
+                                       fade_data: Option<&(Attack, Release)>) where
+        NF: NoteFreq,
+        S: Sample,
+        W: Waveform,
+        A: Amplitude,
+        F: Frequency,
+        FW: FreqWarp,
     {
         let Voice {
-            ref mut oscillator_phases,
+            ref mut oscillator_states,
             ref mut playhead,
             ref mut loop_playhead,
             ref mut maybe_note,
         } = *self;
 
+        let DspSettings { sample_hz, channels, .. } = settings;
         let (attack, release) = fade_data.map_or_else(|| (0, 0), |&(a, r)| (a, r));
-        let velocity = maybe_note.map_or_else(|| 1.0, |(_, _, _, velocity)| velocity);
+        let velocity = maybe_note.as_ref().map_or_else(|| 1.0, |&(_, _, _, velocity)| velocity);
 
-        let frame_ms = Samples(1).ms(settings.sample_hz as f64);
+        let frame_ms = Samples(1).ms(sample_hz as f64);
 
-        for frame in output.chunks_mut(settings.channels as usize) {
+        for frame in output.chunks_mut(channels as usize) {
 
             // Calculate the amplitude of the current frame.
             let wave = if maybe_note.is_some() && *loop_playhead < duration {
-                let ratio = *loop_playhead as f64 / duration as f64;
+                let playhead_perc = *loop_playhead as f64 / duration as f64;
 
-                let (note_state, current_freq) = maybe_note.as_mut()
+                let (note_state, hz) = maybe_note.as_mut()
                     .map(|&mut(note_state, _, ref mut freq, _)| {
-                        let current_freq = *freq;
-                        // Update the ms count of the portamento.
-                        let maybe_constant_hz = match *freq {
-                            CurrentFreq::Portamento(ref mut ms, _, dur, target_mel) => {
-                                *ms = *ms + frame_ms;
-                                if *ms > dur { Some(pitch::Mel(target_mel).hz()) } else { None }
-                            },
-                            _ => None,
-                        };
-                        // If the ms count has exceeded the duration, set the freq.
-                        if let Some(constant_hz) = maybe_constant_hz {
-                            *freq = CurrentFreq::Constant(constant_hz);
-                        }
-                        (note_state, current_freq)
+                        freq.step_frame(frame_ms);
+                        (note_state, freq.hz())
                     }).unwrap();
 
-                let freq_multi = current_freq.hz() as f64 / base_pitch as f64;
+                let freq_multi = hz as f64 / base_pitch as f64;
 
                 // Sum the amplitude of each oscillator at the given ratio.
-                let active_oscillators = oscillators.iter().zip(oscillator_phases.iter_mut())
+                let active_oscillators = oscillators.iter().zip(oscillator_states.iter_mut())
                     .filter(|&(osc, _)| !osc.is_muted);
-                active_oscillators.fold(0.0, |total, (osc, phase)| {
-                    let mut wave = osc.amp_at_ratio(*phase, ratio);
-                    *phase = osc.next_phase(*phase, ratio, freq_multi, settings.sample_hz as f64);
+
+                // Fold the active oscillators and their state
+                active_oscillators.fold(0.0, |total, (osc, osc_state)| {
+
+                    // Determine the amplitude at the current phase and playhead position.
+                    let mut wave = osc.amp_at(osc_state.phase, playhead_perc);
+
+                    // Update the oscillator state's phase and freq_warp_phase.
+                    osc_state.phase = osc.next_phase(osc_state.phase,
+                                                     playhead_perc,
+                                                     freq_multi,
+                                                     sample_hz as f64,
+                                                     &mut osc_state.freq_warp_phase);
+
                     // If within the attack duration, apply the fade.
                     if *playhead < attack {
                         wave *= *playhead as f32 / attack as f32;
                     }
+
                     // If within the release duration, apply the fade.
                     if let NoteState::Released(release_playhead) = note_state {
                         wave *= (release - release_playhead) as f32 / release as f32;
                     }
+
                     wave + total
                 })
             } else {
