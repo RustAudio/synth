@@ -6,6 +6,9 @@
 pub trait Waveform {
     /// Return the amplitude given some phase.
     fn amp_at_phase(&self, phase: f64) -> f32;
+    /// An optional method for processing the frequency. 
+    #[inline]
+    fn process_hz(&self, hz: f64) -> f64 { hz }
 }
 
 
@@ -115,6 +118,12 @@ impl Waveform for NoiseWalk {
     #[inline]
     fn amp_at_phase(&self, phase: f64) -> f32 {
         ::utils::noise_walk(phase as f32)
+    }
+    #[inline]
+    fn process_hz(&self, hz: f64) -> f64 {
+        use pitch;
+        let perc = pitch::Hz(hz as f32).perc();
+        pitch::ScaledPerc(perc, 0.6).hz() as f64
     }
 }
 

@@ -101,10 +101,12 @@ impl<W, A, F, FW> Oscillator<W, A, F, FW> {
                       note_freq_multi: f64,
                       sample_hz: f64,
                       freq_warp_phase: &mut f64) -> f64 where
+        W: Waveform,
         F: Frequency,
         FW: FreqWarp,
     {
         let hz = self.frequency.hz_at_playhead(playhead_perc);
+        let hz = self.waveform.process_hz(hz);
         self.freq_warp.step_phase(sample_hz, freq_warp_phase);
         let warped_hz = self.freq_warp.warp_hz(hz, *freq_warp_phase);
         let note_hz = warped_hz * note_freq_multi;
