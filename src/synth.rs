@@ -17,7 +17,7 @@ use panning::stereo;
 use pitch;
 use std::iter::repeat;
 use time::{self, Ms};
-use voice::{NoteHz, NoteVelocity, OscillatorState, Voice};
+use voice::{NoteVelocity, OscillatorState, Voice};
 
 
 pub type Duration = time::calc::Ms;
@@ -350,16 +350,22 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     /// If no `Voice`s are free, the one playing the oldest note will be chosen to
     /// play the new note instead.
     #[inline]
-    pub fn note_on(&mut self, note_hz: NoteHz, note_vel: NoteVelocity) where M: Mode {
+    pub fn note_on<T>(&mut self, note_hz: T, note_vel: NoteVelocity)
+        where M: Mode,
+              T: Into<pitch::Hz>
+    {
         let Synth { detune, ref note_freq_gen, ref mut mode, ref mut voices, .. } = *self;
-        mode.note_on(note_hz, note_vel, detune, note_freq_gen, voices);
+        mode.note_on(note_hz.into().hz(), note_vel, detune, note_freq_gen, voices);
     }
 
     /// Stop playback of the note that was triggered with the matching frequency.
     #[inline]
-    pub fn note_off(&mut self, note_hz: NoteHz) where M: Mode {
+    pub fn note_off<T>(&mut self, note_hz: T)
+        where M: Mode,
+              T: Into<pitch::Hz>
+    {
         let Synth { detune, ref note_freq_gen,  ref mut mode, ref mut voices, .. } = *self;
-        mode.note_off(note_hz, detune, note_freq_gen, voices);
+        mode.note_off(note_hz.into().hz(), detune, note_freq_gen, voices);
     }
 
     /// Pause playback.
