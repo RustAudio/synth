@@ -74,9 +74,9 @@ fn main() {
     };
 
     // Construct a note for the synth to perform. Have a play around with the pitch and duration!
-    let note_hz = LetterOctave(Letter::C, 1).hz();
+    let note = LetterOctave(Letter::C, 1);
     let note_velocity = 1.0;
-    synth.note_on(note_hz, note_velocity);
+    synth.note_on(note, note_velocity);
 
     // We'll call this to release the note after 4 seconds.
     let note_duration = 4.0;
@@ -94,7 +94,7 @@ fn main() {
             // Once the timer exceeds our note duration, send the note_off.
             if timer > note_duration {
                 if !is_note_off {
-                    synth.note_off(note_hz);
+                    synth.note_off(note);
                     is_note_off = true;
                 }
             }
