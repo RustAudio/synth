@@ -24,11 +24,11 @@ fn main() {
 
     // Construct our fancy Synth!
     let mut synth = {
-        use synth::{Point, Oscillator, mode, oscillator};
+        use synth::{Point, Oscillator, mode, oscillator, Envelope};
 
         // The following envelopes should create a downward pitching sine wave that gradually quietens.
         // Try messing around with the points and adding some of your own!
-        let amp_env = oscillator::AmpEnvelope::from_points(vec!(
+        let amp_env = Envelope::from(vec!(
             //         Time ,  Amp ,  Curve
             Point::new(0.0  ,  0.0 ,  0.0),
             Point::new(0.01 ,  1.0 ,  0.0),
@@ -36,7 +36,7 @@ fn main() {
             Point::new(0.81 ,  0.8 ,  0.0),
             Point::new(1.0  ,  0.0 ,  0.0),
         ));
-        let freq_env = oscillator::FreqEnvelope::from_points(vec!(
+        let freq_env = Envelope::from(vec!(
             //         Time    , Freq   , Curve
             Point::new(0.0     , 0.0    , 0.0),
             Point::new(0.00136 , 1.0    , 0.0),

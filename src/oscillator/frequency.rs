@@ -1,5 +1,4 @@
 
-use env_point::Point;
 use envelope;
 use pitch;
 
@@ -16,8 +15,8 @@ pub trait Frequency {
     }
 }
 
-/// An alias for the envelope used.
-pub type Envelope = envelope::Envelope<Point>;
+/// Alias for the Envelope used.
+pub type Envelope = envelope::Envelope;
 
 /// A type that allows dynamically switching between constant and enveloped frequency.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
@@ -36,12 +35,14 @@ impl Dynamic {
 
     /// Convert the dynamic to its Envelope variant.
     pub fn to_env(&self) -> Dynamic {
+        use std::iter::once;
         if let Dynamic::Hz(hz) = *self {
             let perc = pitch::Hz(hz as f32).perc();
-            return Dynamic::Envelope(Envelope::from_points(vec![
-                Point::new(0.0, perc, 0.0),
-                Point::new(1.0, perc, 0.0),
-            ]))
+            return Dynamic::Envelope({
+                once(envelope::Point::new(0.0, perc, 0.0))
+                    .chain(once(envelope::Point::new(1.0, perc, 0.0)))
+                    .collect()
+            })
         }
         self.clone()
     }
@@ -73,7 +74,8 @@ impl Frequency for Envelope {
     }
     #[inline]
     fn freq_perc_at_playhead(&self, perc: f64) -> f64 {
-        self.y(perc).expect("The given playhead position is out of range (0.0..1.0).")
+        envelope::Trait::y(self, perc)
+            .expect("The given playhead position is out of range (0.0..1.0).")
     }
 }
 

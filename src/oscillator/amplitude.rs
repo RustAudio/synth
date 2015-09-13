@@ -1,6 +1,6 @@
 
-use env_point::Point;
 use envelope;
+use envelope::Trait as EnvelopeTrait;
 
 
 /// Types for generating the amplitude given some playhead position.
@@ -11,8 +11,7 @@ pub trait Amplitude {
 }
 
 /// Alias for the Envelope used.
-pub type Envelope = envelope::Envelope<Point>;
-
+pub type Envelope = envelope::Envelope;
 
 /// A type that allows dynamically switching between constant and enveloped amplitude.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
