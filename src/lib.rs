@@ -14,6 +14,7 @@ extern crate utils;
 
 pub use dynamic::Synth as Dynamic;
 pub use envelope::{Envelope, Point};
+pub use envelope::Trait as EnvelopeTrait;
 pub use note_freq::{NoteFreqGenerator, NoteFreq, Portamento, PortamentoFreq};
 pub use oscillator::{AmpEnvelope, FreqEnvelope, Oscillator, Waveform};
 pub use synth::Synth;
