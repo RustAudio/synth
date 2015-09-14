@@ -25,7 +25,8 @@ impl ::std::convert::From<Vec<Point>> for Envelope {
     }
 }
 
-impl Trait<Point> for Envelope {
+impl<'a> Trait<'a, Point> for Envelope {
+    type Points = ::std::slice::Iter<'a, Point>;
     #[inline]
-    fn points(&self) -> &[Point] { &self.points }
+    fn points(&'a self) -> Self::Points { self.points.iter() }
 }
