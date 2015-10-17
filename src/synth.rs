@@ -474,7 +474,7 @@ impl<S, M, NFG, W, A, F, FW> DspNode<S> for Synth<M, NFG, W, A, F, FW> where
                 voice_amp_per_channel[1] = amp_per_channel[1] * panned[1];
             }
 
-            Sample::add_buffers(output, &working, &voice_amp_per_channel);
+            Sample::add_buffer_with_amp_per_channel(output, &working, &voice_amp_per_channel);
         }
     }
 
