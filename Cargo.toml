@@ -13,7 +13,7 @@ homepage = "https://github.com/RustAudio/synth"
 
 [dependencies]
 dsp-chain = "0.9.0"
-envelope = "0.6.2"
+envelope = "0.6.3"
 mindtree_utils = "0.3.0"
 num = "0.1.27"
 panning = "0.1.1"
