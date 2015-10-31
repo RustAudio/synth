@@ -2,7 +2,7 @@
 
 name = "synth"
 description = "A polyphonic Synth type whose multiple oscillators generate sound via amplitude and frequency envelopes."
-version = "0.8.0"
+version = "0.9.0"
 authors = ["mitchmindtree <mitchell.nordine@gmail.com>"]
 readme = "README.md"
 keywords = ["synthesis", "dsp", "audio", "music", "instrument"]
@@ -12,8 +12,8 @@ homepage = "https://github.com/RustAudio/synth"
 
 
 [dependencies]
-dsp-chain = "0.8.0"
-envelope = "0.6.2"
+dsp-chain = "0.9.0"
+envelope = "0.6.3"
 mindtree_utils = "0.3.0"
 num = "0.1.27"
 panning = "0.1.1"
