@@ -1,4 +1,3 @@
-
 //! Implementation of the `Synth` struct for basic polyphonic, multi-oscillator envelope synthesis.
 
 extern crate dsp;
@@ -27,4 +26,3 @@ pub mod note_freq;
 pub mod oscillator;
 mod synth;
 mod voice;
-

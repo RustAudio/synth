@@ -8,10 +8,12 @@
 
 extern crate dsp;
 extern crate pitch_calc as pitch;
+extern crate portaudio;
 extern crate synth;
 extern crate time_calc as time;
 
-use dsp::{CallbackFlags, CallbackResult, Node, Sample, SoundStream, Settings, StreamParams};
+use dsp::{Node, Sample, Settings};
+use portaudio as pa;
 use pitch::{Letter, LetterOctave};
 use synth::Synth;
 
@@ -20,7 +22,15 @@ pub type AudioSample = f32;
 pub type Input = AudioSample;
 pub type Output = AudioSample;
 
+const CHANNELS: i32 = 2;
+const FRAMES: u32 = 64;
+const SAMPLE_HZ: f64 = 44_100.0;
+
 fn main() {
+    run().unwrap()
+}
+
+fn run() -> Result<(), pa::Error> {
 
     // Construct our fancy Synth!
     let mut synth = {
@@ -85,12 +95,21 @@ fn main() {
     // We'll use this to keep track of time and break from the loop after 6 seconds.
     let mut timer: f64 = 0.0;
 
+    // This will be used to determine the delta time between calls to the callback.
+    let mut prev_time = None;
+
     // The callback we'll use to pass to the Stream.
-    let callback = Box::new(move |output: &mut[f32], settings: Settings, dt: f64, _: CallbackFlags| {
-        Sample::zero_buffer(output);
-        synth.audio_requested(output, settings);
+    let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, time, .. }| {
+        Sample::zero_buffer(buffer);
+        let settings = Settings::new(SAMPLE_HZ as u32, frames as u16, CHANNELS as u16);
+        synth.audio_requested(buffer, settings);
         if timer < 6.0 {
+
+            let last_time = prev_time.unwrap_or(time.current);
+            let dt = time.current - last_time;
             timer += dt;
+            prev_time = Some(time.current);
+
             // Once the timer exceeds our note duration, send the note_off.
             if timer > note_duration {
                 if !is_note_off {
@@ -98,16 +117,20 @@ fn main() {
                     is_note_off = true;
                 }
             }
-            CallbackResult::Continue
+            pa::Continue
         } else {
-            CallbackResult::Complete
+            pa::Complete
         }
-    });
+    };
 
-    // Construct the default, non-blocking output stream and run our callback.
-    let stream = SoundStream::new().output(StreamParams::new()).run_callback(callback).unwrap();
+    // Construct PortAudio and the stream.
+    let pa = try!(pa::PortAudio::new());
+    let settings = try!(pa.default_output_stream_settings::<f32>(CHANNELS, SAMPLE_HZ, FRAMES));
+    let mut stream = try!(pa.open_non_blocking_stream(settings, callback));
+    try!(stream.start());
 
     // Loop while the stream is active.
     while let Ok(true) = stream.is_active() {}
 
+    Ok(())
 }
