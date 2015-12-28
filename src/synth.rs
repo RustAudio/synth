@@ -28,9 +28,8 @@ pub type Attack = time::calc::Ms;
 pub type Release = time::calc::Ms;
 pub type Playhead = time::calc::Samples;
 
-/// The `Synth` generates audio via a vector of `Voice`s,
-/// while a `Voice` generates audio via a vector of
-/// `Oscillator`s, creating a small DSP tree.
+/// The `Synth` generates audio via a vector of `Voice`s, while a `Voice` generates audio via a
+/// vector of `Oscillator`s, creating a small DSP tree.
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
 pub struct Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerator {
     /// Oscillators for playback.
@@ -68,7 +67,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 
     /// Constructor for a new Synth.
     #[inline]
-    pub fn new(mode: M, note_freq_gen: NFG) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn new(mode: M, note_freq_gen: NFG) -> Self {
         const MS_300: Duration = 300.0;
         const C_1: BasePitch = 32.703;
         Synth {
@@ -90,7 +89,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 
     /// Return the synth with the given number of voices.
     #[inline]
-    pub fn num_voices(mut self, num_voices: usize) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn num_voices(mut self, num_voices: usize) -> Self {
         self.set_num_voices(num_voices);
         self
     }
@@ -148,16 +147,14 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 
     /// Add an oscillator to a Synth.
     #[inline]
-    pub fn oscillator(mut self, oscillator: Oscillator<W, A, F, FW>) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn oscillator(mut self, oscillator: Oscillator<W, A, F, FW>) -> Self {
         self.add_oscillator(oscillator);
         self
     }
 
     /// Add multiple oscillators to a Synth.
     #[inline]
-    pub fn oscillators<I: Iterator<Item=Oscillator<W, A, F, FW>>>
-    (mut self, oscillators: I)
-    -> Synth<M, NFG, W, A, F, FW>
+    pub fn oscillators<I: Iterator<Item=Oscillator<W, A, F, FW>>>(mut self, oscillators: I) -> Self
     {
         let len = self.oscillators.len();
         self.oscillators.extend(oscillators);
@@ -169,13 +166,13 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     }
 
     /// Set the Synth's duration.
-    pub fn duration(mut self, duration: Duration) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
         self
     }
 
     /// Set the amplitude for each channel.
-    pub fn channels(mut self, channels: Vec<f32>) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn channels(mut self, channels: Vec<f32>) -> Self {
         self.channels = channels;
         self
     }
@@ -183,7 +180,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     /// Set the amplitude of each channel according to a given stereo pan between -1.0 and 1.0.
     /// If the given value is outside the range -1.0..1.0, it will be clamped to range.
     /// The synth's number of channels will be set to two if it does not already have two.
-    pub fn stereo_pan(mut self, pan: f32) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn stereo_pan(mut self, pan: f32) -> Self {
         let pan = if pan < -1.0 { -1.0 } else if pan > 1.0 { 1.0 } else { pan };
         let len = self.channels.len();
         if len > 2 {
@@ -198,25 +195,25 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     }
 
     /// Set the Synth's base pitch.
-    pub fn base_pitch(mut self, base_pitch: BasePitch) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn base_pitch(mut self, base_pitch: BasePitch) -> Self {
         self.base_pitch = base_pitch;
         self
     }
 
     /// Set the Synth's detune amount.
-    pub fn detune(mut self, detune: f32) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn detune(mut self, detune: f32) -> Self {
         self.detune = detune;
         self
     }
 
     /// Set the Synth's spread amount.
-    pub fn spread(mut self, spread: f32) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn spread(mut self, spread: f32) -> Self {
         self.spread = spread;
         self
     }
 
     /// Set the Synth's volume.
-    pub fn volume(mut self, vol: f32) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn volume(mut self, vol: f32) -> Self {
         self.volume = vol;
         self
     }
