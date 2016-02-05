@@ -18,7 +18,6 @@ Features
 - Multi-voice (unison) support in Mono mode.
 - Legato and Retrigger Mono modes.
 - Warbliness Oscillator builder method that uses gaussian noise to model the "warped-old-hardware-synth" sound.
-- Uses [sound_stream](https://github.com/RustAudio/sound_stream) and its Sample trait and in turn is generic over any bit-depth or sample format.
 
 ```Rust
 synth.audio_requested(buffer, SETTINGS),
