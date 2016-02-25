@@ -60,7 +60,10 @@ impl ::std::ops::DerefMut for Synth {
     }
 }
 
-impl<S> ::dsp::Node<S> for Synth where S: ::dsp::Sample {
+impl<S> ::dsp::Node<S> for Synth
+    where S: ::dsp::Sample + ::dsp::FromSample<f32>,
+          f32: ::dsp::FromSample<S>,
+{
     fn audio_requested(&mut self, output: &mut [S], settings: ::dsp::Settings) {
         ::dsp::Node::audio_requested(&mut self.0, output, settings)
     }

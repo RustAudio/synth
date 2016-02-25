@@ -5,8 +5,7 @@
 //!
 //!
 
-use dsp::Settings as DspSettings;
-use dsp::{Sample};
+use dsp::{FromSample, Sample, Settings as DspSettings};
 use oscillator::{Amplitude, Frequency, FreqWarp, Oscillator, Waveform};
 use note_freq::NoteFreq;
 use pitch::{self, Hz};
@@ -126,7 +125,7 @@ impl<NF> Voice<NF> {
                                        loop_data: Option<&(LoopStart, LoopEnd)>,
                                        fade_data: Option<&(Attack, Release)>) where
         NF: NoteFreq,
-        S: Sample,
+        S: Sample + FromSample<f32>,
         W: Waveform,
         A: Amplitude,
         F: Frequency,
@@ -195,7 +194,7 @@ impl<NF> Voice<NF> {
 
             // Assign the amp to each channel.
             for channel in frame.iter_mut() {
-                *channel = Sample::from_wave(wave * velocity);
+                *channel = (wave * velocity).to_sample::<S>();
             }
 
             // Iterate the release playhead and check for whether or not the release playhead
