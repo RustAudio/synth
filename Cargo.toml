@@ -12,16 +12,16 @@ homepage = "https://github.com/RustAudio/synth"
 
 
 [dependencies]
-dsp-chain = "0.11.0"
-envelope = "0.6.3"
+dsp-chain = "0.12.0"
+envelope = "0.7.0"
 mindtree_utils = "0.3.0"
 num = "0.1.29"
 panning = "0.1.1"
 pitch_calc = "0.9.7"
-rand = "0.3.11"
+rand = "0.3.14"
 rustc-serialize = "0.3.16"
 simple_gaussian = "0.4.4"
 time_calc = "0.10.0"
 
 [dev-dependencies]
-portaudio = "0.6.2"
+portaudio = "0.6.3"
