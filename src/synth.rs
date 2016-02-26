@@ -7,7 +7,7 @@
 //!  Implementation of the `Synth` struct for basic multi-voice, multi-oscillator envelope synthesis.
 //!
 
-use dsp::{sample, Node as DspNode, FromSample, Sample, Settings as DspSettings};
+use dsp::{sample, Node as DspNode, Sample, Settings as DspSettings};
 use mode::Mode;
 use oscillator::{self, FreqWarp, Oscillator};
 use note_freq::{NoteFreq, NoteFreqGenerator};
@@ -387,13 +387,12 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 }
 
 impl<S, M, NFG, W, A, F, FW> DspNode<S> for Synth<M, NFG, W, A, F, FW> where
-    S: Sample + FromSample<f32>,
+    S: Sample + sample::Duplex<f32>,
     NFG: NoteFreqGenerator,
     W: oscillator::Waveform,
     A: oscillator::Amplitude,
     F: oscillator::Frequency,
     FW: FreqWarp,
-    f32: FromSample<S>,
 {
 
     #[inline]
