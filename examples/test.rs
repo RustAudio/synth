@@ -12,7 +12,7 @@ extern crate portaudio;
 extern crate synth;
 extern crate time_calc as time;
 
-use dsp::{Node, Sample, Settings};
+use dsp::{Node, Settings};
 use portaudio as pa;
 use pitch::{Letter, LetterOctave};
 use synth::Synth;
@@ -100,7 +100,7 @@ fn run() -> Result<(), pa::Error> {
 
     // The callback we'll use to pass to the Stream.
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, time, .. }| {
-        Sample::zero_buffer(buffer);
+        dsp::sample::buffer::equilibrium(buffer);
         let settings = Settings::new(SAMPLE_HZ as u32, frames as u16, CHANNELS as u16);
         synth.audio_requested(buffer, settings);
         if timer < 6.0 {

@@ -7,9 +7,7 @@
 //!  Implementation of the `Synth` struct for basic multi-voice, multi-oscillator envelope synthesis.
 //!
 
-use dsp::Node as DspNode;
-use dsp::Settings as DspSettings;
-use dsp::Sample;
+use dsp::{sample, Node as DspNode, Sample, Settings as DspSettings};
 use mode::Mode;
 use oscillator::{self, FreqWarp, Oscillator};
 use note_freq::{NoteFreq, NoteFreqGenerator};
@@ -389,7 +387,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 }
 
 impl<S, M, NFG, W, A, F, FW> DspNode<S> for Synth<M, NFG, W, A, F, FW> where
-    S: Sample,
+    S: Sample + sample::Duplex<f32>,
     NFG: NoteFreqGenerator,
     W: oscillator::Waveform,
     A: oscillator::Amplitude,
@@ -447,7 +445,7 @@ impl<S, M, NFG, W, A, F, FW> DspNode<S> for Synth<M, NFG, W, A, F, FW> where
         for (i, voice) in voices.iter_mut().filter(|v| is_active(v)).enumerate() {
 
             // A working buffer which we will fill using the Voice.
-            let mut working: Vec<S> = vec![Sample::zero(); settings.buffer_size()];
+            let mut working: Vec<S> = vec![S::equilibrium(); settings.buffer_size()];
 
             // Fill the working buffer with the voice.
             voice.fill_buffer(&mut working,
@@ -471,7 +469,7 @@ impl<S, M, NFG, W, A, F, FW> DspNode<S> for Synth<M, NFG, W, A, F, FW> where
                 voice_amp_per_channel[1] = amp_per_channel[1] * panned[1];
             }
 
-            Sample::add_buffer_with_amp_per_channel(output, &working, &voice_amp_per_channel);
+            sample::buffer::add_with_amp_per_channel(output, &working, &voice_amp_per_channel);
         }
     }
 
