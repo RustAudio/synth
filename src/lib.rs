@@ -3,6 +3,7 @@
 extern crate dsp;
 extern crate envelope as envelope_lib;
 extern crate gaussian;
+extern crate instrument;
 extern crate num;
 extern crate panning;
 extern crate pitch_calc as pitch;

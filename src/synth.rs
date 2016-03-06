@@ -61,7 +61,9 @@ pub struct Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerator {
 }
 
 
-impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerator {
+impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW>
+    where NFG: NoteFreqGenerator,
+{
 
     /// Constructor for a new Synth.
     #[inline]
@@ -268,19 +270,19 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     }
 
     /// Set the loop data for the synth.
-    pub fn loop_points(mut self, start: LoopStart, end: LoopEnd) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn loop_points(mut self, start: LoopStart, end: LoopEnd) -> Self {
         self.loop_data = Some((start, end));
         self
     }
 
     /// Set the fade data for the synth.
-    pub fn fade(mut self, attack: Attack, release: Release) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn fade(mut self, attack: Attack, release: Release) -> Self {
         self.fade_data = Some((attack, release));
         self
     }
 
     /// Set the start loop point.
-    pub fn loop_start(mut self, start: LoopStart) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn loop_start(mut self, start: LoopStart) -> Self {
         let loop_data = match self.loop_data {
             Some((_, end)) => Some((start, end)),
             None => Some((start, 1.0))
@@ -290,7 +292,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     }
 
     /// Set the end loop point.
-    pub fn loop_end(mut self, end: LoopEnd) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn loop_end(mut self, end: LoopEnd) -> Self {
         let loop_data = match self.loop_data {
             Some((start, _)) => Some((start, end)),
             None => Some((0.0, end))
@@ -300,7 +302,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     }
 
     /// Set the attack.
-    pub fn attack(mut self, attack: Attack) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn attack(mut self, attack: Attack) -> Self {
         let fade_data = match self.fade_data {
             Some((_, release)) => Some((attack, release)),
             None => Some((attack, 0.0))
@@ -310,7 +312,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
     }
 
     /// Set the release.
-    pub fn release(mut self, release: Release) -> Synth<M, NFG, W, A, F, FW> {
+    pub fn release(mut self, release: Release) -> Self {
         let fade_data = match self.fade_data {
             Some((attack, _)) => Some((attack, release)),
             None => Some((0.0, release))
@@ -377,7 +379,9 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 
     /// Stop playback and clear the current notes.
     #[inline]
-    pub fn stop(&mut self) where M: Mode {
+    pub fn stop(&mut self)
+        where M: Mode,
+    {
         self.mode.stop();
         for voice in self.voices.iter_mut() {
             voice.stop();
