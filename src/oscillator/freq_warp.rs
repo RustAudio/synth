@@ -56,7 +56,6 @@ impl FreqWarp for Gaussian {
         let Gaussian(perc) = *self;
         if perc > 0.0 {
             use gaussian;
-            use num::Float;
             let mels = pitch::Hz(hz as f32).mel();
             let gaus_mels = mels + gaussian::gen(0.5f32, perc.powf(2.0)) * 1000.0 - 500.0;
             pitch::Mel(gaus_mels).hz() as f64
