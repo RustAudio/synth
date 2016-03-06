@@ -371,7 +371,7 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW> where NFG: NoteFreqGenerato
 
     /// Unpause playback.
     #[inline]
-    pub fn unpause(&mut self ) {
+    pub fn unpause(&mut self) {
         self.is_paused = false;
     }
 

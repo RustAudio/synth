@@ -190,8 +190,3 @@ impl NoteFreq for Dynamic {
         }
     }
 }
-
-
-
-
-
