@@ -2,12 +2,11 @@
 //! A dynamic synth type.
 //!
 
-use mode;
-use note_freq;
+use instrument::{mode, note_freq};
 use synth;
 
-pub use mode::Dynamic as Mode;
-pub use note_freq::Dynamic as NoteFreqGenerator;
+pub use instrument::mode::Dynamic as Mode;
+pub use instrument::note_freq::Dynamic as NoteFreqGenerator;
 
 pub use self::oscillator::{Oscillator, Waveform, Amplitude, Frequency, FreqWarp};
 pub use self::oscillator::new as new_oscillator;
@@ -35,60 +34,40 @@ pub mod oscillator {
 
 
 /// An alias for a completely dynamic synth.
-pub type SynthType = synth::Synth<mode::Dynamic,
-                                  note_freq::DynamicGenerator,
-                                  oscillator::Waveform,
-                                  oscillator::Amplitude,
-                                  oscillator::Frequency,
-                                  oscillator::FreqWarp>;
-
-/// A wrapper for extending the functionality of a completely dynamic Synth.
-#[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
-pub struct Synth(pub SynthType);
-
-
-impl ::std::ops::Deref for Synth {
-    type Target = SynthType;
-    fn deref<'a>(&'a self) -> &'a SynthType {
-        &self.0
-    }
-}
-
-impl ::std::ops::DerefMut for Synth {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut SynthType {
-        &mut self.0
-    }
-}
-
-impl<S> ::dsp::Node<S> for Synth
-    where S: ::dsp::Sample + ::dsp::sample::Duplex<f32>,
-{
-    fn audio_requested(&mut self, output: &mut [S], settings: ::dsp::Settings) {
-        ::dsp::Node::audio_requested(&mut self.0, output, settings)
-    }
-}
-
-
-/// Construct the default dynamic synth.
-pub fn new() -> SynthType {
-    synth::Synth::new(mode::Dynamic::retrigger(), note_freq::DynamicGenerator::Constant)
-}
-
+pub type Synth = synth::Synth<mode::Dynamic,
+                              note_freq::DynamicGenerator,
+                              oscillator::Waveform,
+                              oscillator::Amplitude,
+                              oscillator::Frequency,
+                              oscillator::FreqWarp>;
 
 impl Synth {
 
+    /// Construct an entirely dynamic `Synth`.
+    pub fn dynamic(dynamic_mode: mode::Dynamic) -> Self {
+        synth::Synth::new(dynamic_mode, note_freq::DynamicGenerator::Constant)
+    }
+
+    pub fn dynamic_retrigger() -> Self {
+        Self::dynamic(mode::Dynamic::retrigger())
+    }
+
+    pub fn dynamic_legato() -> Self {
+        Self::dynamic(mode::Dynamic::legato())
+    }
+
+    pub fn dynamic_poly() -> Self {
+        Self::dynamic(mode::Dynamic::poly())
+    }
+
     /// Set the mode of the synth.
     pub fn set_mode(&mut self, mode: mode::Dynamic) {
-        let Synth(ref mut synth) = *self;
-        synth.mode = mode;
+        self.instrument.mode = mode;
     }
 
     /// Set the note frequency generator to be used by the synth.
     pub fn set_note_freq_gen(&mut self, note_freq_gen: note_freq::DynamicGenerator) {
-        let Synth(ref mut synth) = *self;
-        synth.note_freq_gen = note_freq_gen;
+        self.instrument.note_freq_gen = note_freq_gen;
     }
 
 }
-
-

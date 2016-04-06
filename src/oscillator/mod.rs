@@ -9,6 +9,8 @@ pub use self::frequency::Frequency;
 pub use self::frequency::Envelope as FreqEnvelope;
 pub use self::freq_warp::FreqWarp;
 
+use time;
+
 pub mod waveform;
 pub mod amplitude;
 pub mod frequency;
@@ -16,7 +18,7 @@ pub mod freq_warp;
 
 
 /// The fundamental component of a synthesizer.
-#[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct Oscillator<W, A, F, FW> {
     /// Waveform used for phase movement.
     pub waveform: W,
@@ -30,12 +32,34 @@ pub struct Oscillator<W, A, F, FW> {
     pub is_muted: bool,
 }
 
+/// The state of an Oscillator that is unique to each voice playing it.
+#[derive(Copy, Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
+pub struct State {
+    /// The Oscillator's current phase.
+    pub phase: f64,
+    /// The phase of the FreqWarp used to warp the oscillator's frequency.
+    pub freq_warp_phase: f64,
+}
+
+/// The state of each oscillator per-voice.
+#[derive(Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
+pub struct StatePerVoice(pub Vec<State>);
+
+
+impl State {
+    pub fn new() -> Self {
+        State {
+            phase: 0.0,
+            freq_warp_phase: 0.0,
+        }
+    }
+}
 
 impl<W, A, F, FW> Oscillator<W, A, F, FW> {
 
     /// Oscillator constructor.
     #[inline]
-    pub fn new(waveform: W, amplitude: A, frequency: F, freq_warp: FW) -> Oscillator<W, A, F, FW> {
+    pub fn new(waveform: W, amplitude: A, frequency: F, freq_warp: FW) -> Self {
         Oscillator {
             waveform: waveform,
             amplitude: amplitude,
@@ -95,15 +119,15 @@ impl<W, A, F, FW> Oscillator<W, A, F, FW> {
 
     /// Calculate and return the phase that should follow some given phase.
     #[inline]
-    pub fn next_phase(&self,
-                      phase: f64,
-                      playhead_perc: f64,
-                      note_freq_multi: f64,
-                      sample_hz: f64,
-                      freq_warp_phase: &mut f64) -> f64 where
-        W: Waveform,
-        F: Frequency,
-        FW: FreqWarp,
+    pub fn next_frame_phase(&self,
+                            sample_hz: f64,
+                            playhead_perc: f64,
+                            note_freq_multi: f64,
+                            phase: f64,
+                            freq_warp_phase: &mut f64) -> f64
+        where W: Waveform,
+              F: Frequency,
+              FW: FreqWarp,
     {
         let hz = self.frequency.hz_at_playhead(playhead_perc);
         let hz = self.waveform.process_hz(hz);
@@ -113,5 +137,27 @@ impl<W, A, F, FW> Oscillator<W, A, F, FW> {
         phase + (note_hz / sample_hz)
     }
 
-}
+    /// Steps forward the given `phase` and `freq_warp_phase` and yields the amplitude for the
+    /// next frame.
+    #[inline]
+    pub fn next_frame_amp(&mut self,
+                          sample_hz: time::SampleHz,
+                          playhead_perc: f64,
+                          note_freq_multi: f64,
+                          state: &mut State) -> f32
+        where A: Amplitude,
+              W: Waveform,
+              F: Frequency,
+              FW: FreqWarp,
+    {
+        let amp = self.amp_at(state.phase, playhead_perc);
+        let next_phase = self.next_frame_phase(sample_hz,
+                                               playhead_perc,
+                                               note_freq_multi,
+                                               state.phase,
+                                               &mut state.freq_warp_phase);
+        state.phase = next_phase;
+        amp
+    }
 
+}

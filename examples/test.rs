@@ -6,16 +6,14 @@
 //!  Always remember to run high performance Rust code with the --release flag. `Synth` 
 //!
 
-extern crate dsp;
 extern crate pitch_calc as pitch;
 extern crate portaudio;
+extern crate sample;
 extern crate synth;
 
-use dsp::{Node, Settings};
 use portaudio as pa;
 use pitch::{Letter, LetterOctave};
 use synth::Synth;
-use std::{thread, time};
 
 // Currently supports i8, i32, f32.
 pub type AudioSample = f32;
@@ -34,7 +32,7 @@ fn run() -> Result<(), pa::Error> {
 
     // Construct our fancy Synth!
     let mut synth = {
-        use synth::{Point, Oscillator, mode, oscillator, Envelope};
+        use synth::{Point, Oscillator, oscillator, Envelope};
 
         // The following envelopes should create a downward pitching sine wave that gradually quietens.
         // Try messing around with the points and adding some of your own!
@@ -62,14 +60,14 @@ fn run() -> Result<(), pa::Error> {
         let oscillator = Oscillator::new(oscillator::waveform::Square, amp_env, freq_env, ());
 
         // Here we construct our Synth from our oscillator.
-        Synth::new(mode::Mono::retrigger(), ())
+        Synth::retrigger(())
             .oscillator(oscillator) // Add as many different oscillators as desired.
             .duration(6000.0) // Milliseconds.
             .base_pitch(LetterOctave(Letter::C, 1).hz()) // Hz.
             .loop_points(0.49, 0.51) // Loop start and end points.
             .fade(500.0, 500.0) // Attack and Release in milliseconds.
             .num_voices(16) // By default Synth is monophonic but this gives it `n` voice polyphony.
-            .volume(0.20)
+            .volume(0.2)
             .detune(0.5)
             .spread(1.0)
 
@@ -99,10 +97,11 @@ fn run() -> Result<(), pa::Error> {
     let mut prev_time = None;
 
     // The callback we'll use to pass to the Stream.
-    let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, time, .. }| {
-        dsp::sample::buffer::equilibrium(buffer);
-        let settings = Settings::new(SAMPLE_HZ as u32, frames as u16, CHANNELS as u16);
-        synth.audio_requested(buffer, settings);
+    let callback = move |pa::OutputStreamCallbackArgs { buffer, time, .. }| {
+        let buffer: &mut [[f32; CHANNELS as usize]] = sample::slice::to_frame_slice_mut(buffer).unwrap();
+        sample::slice::equilibrium(buffer);
+
+        synth.fill_slice(buffer, SAMPLE_HZ as f64);
         if timer < 6.0 {
 
             let last_time = prev_time.unwrap_or(time.current);
@@ -129,10 +128,12 @@ fn run() -> Result<(), pa::Error> {
     let mut stream = try!(pa.open_non_blocking_stream(settings, callback));
     try!(stream.start());
 
-    let ten_millis = time::Duration::from_millis(10);
+    let ten_millis = std::time::Duration::from_millis(10);
 
     // Loop while the stream is active.
-    while let Ok(true) = stream.is_active() { thread::sleep(ten_millis); }
+    while let Ok(true) = stream.is_active() {
+        std::thread::sleep(std::time::Duration::from_millis(16));
+    }
 
     Ok(())
 }

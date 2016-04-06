@@ -20,7 +20,7 @@ pub type Steepness = f32;
 
 /// An Oscillator must use one of a variety
 /// of waveform types.
-#[derive(Copy, Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Dynamic {
     /// Sine Wave
     Sine,
@@ -37,27 +37,27 @@ pub enum Dynamic {
 }
 
 /// A sine wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sine;
 
 /// A sawtooth wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Saw;
 
 /// An exponential sawtooth wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct SawExp(pub Steepness);
 
 /// A square wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Square;
 
 /// A noise signal.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Noise;
 
 /// A random noise walk wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct NoiseWalk;
 
 

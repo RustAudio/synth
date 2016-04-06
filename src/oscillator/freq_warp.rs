@@ -12,11 +12,11 @@ pub trait FreqWarp {
 }
 
 /// A type for warping the frequency via gaussian randomness.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Gaussian(pub f32);
 
 /// A type for slowly drifting an oscillators pitch via a noise walk.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct PitchDrift {
     /// The frequncy at which the pitch should drift.
     pub hz: f64,
@@ -25,7 +25,7 @@ pub struct PitchDrift {
 }
 
 /// A type that allows switching between various kinds of FreqWarp at runtime.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Dynamic {
     None,
     Gaussian(Gaussian),

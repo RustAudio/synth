@@ -8,7 +8,7 @@ use std::iter::FromIterator;
 pub type Point = env::BezierPoint<f64, f64>;
 
 /// An alias for the envelope to be used used for amp and freq interpolation.
-#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Envelope {
     pub points: Vec<Point>,
 }
@@ -25,7 +25,10 @@ impl ::std::convert::From<Vec<Point>> for Envelope {
     }
 }
 
-impl<'a> Trait<'a, Point> for Envelope {
+impl<'a> Trait<'a> for Envelope {
+    type X = f64;
+    type Y = f64;
+    type Point = Point;
     type Points = ::std::slice::Iter<'a, Point>;
     #[inline]
     fn points(&'a self) -> Self::Points { self.points.iter() }
