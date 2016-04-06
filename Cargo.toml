@@ -1,5 +1,4 @@
 [package]
-
 name = "synth"
 description = "A polyphonic Synth type whose multiple oscillators generate sound via amplitude and frequency envelopes."
 version = "0.10.0"
@@ -10,18 +9,30 @@ license = "MIT"
 repository = "https://github.com/RustAudio/synth.git"
 homepage = "https://github.com/RustAudio/synth"
 
-
 [dependencies]
-dsp-chain = "0.12.0"
-envelope = "0.7.0"
+# envelope = "0.7.0"
+envelope = { path = "../envelope" }
+instrument = { path = "../instrument" }
 mindtree_utils = "0.3.0"
-num = "0.1.29"
 panning = "0.1.1"
 pitch_calc = "0.9.7"
 rand = "0.3.14"
 rustc-serialize = "0.3.16"
+sample = "0.3.0"
 simple_gaussian = "0.4.4"
 time_calc = "0.10.0"
+dsp-chain = { optional = true, version = "0.12.0" }
+serde = { optional = true, version = "0.7.0" }
+serde_json = { optional = true, version = "0.7.0" }
+
+[features]
+default = ["dsp-chain"]
+serde_serialization = [
+    "serde",
+    "serde_json",
+    "envelope/serde_serialization",
+    "instrument/serde_serialization",
+]
 
 [dev-dependencies]
 portaudio = "0.6.3"
