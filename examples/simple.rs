@@ -24,32 +24,39 @@ fn main() {
 }
 
 fn run() -> Result<(), pa::Error> {
-    // Construct the simplest possible synth
+    // Construct the simplest possible synth --
+    // a single voice containing a sine wave oscillating at 440 Hz.
     let mut synth = {
         use synth::dynamic::{Oscillator, Waveform, Amplitude, Frequency, FreqWarp};
 
+        // Create our oscillator at A440
         let oscillator = Oscillator::new(Waveform::Sine,
             Amplitude::Constant(1.0),
             Frequency::Hz(440.0),
             FreqWarp::None);
 
+        // Set up our synth using the oscillator and a single voice
         synth::dynamic::new()
             .oscillator(oscillator)
             .duration(6000.0)
+            .base_pitch(LetterOctave(Letter::C, 1).hz())
             .fade(500.0, 500.0)
             .num_voices(1)
             .volume(0.20)
     };
 
+    // Trigger the synth at its base pitch
     let note = LetterOctave(Letter::C, 1);
     let note_velocity = 1.0;
     synth.note_on(note, note_velocity);
 
+    // These variables are used to break the audio loop after four seconds
     let note_duration = 4.0;
     let mut is_note_off = false;
     let mut timer: f64 = 0.0;
     let mut prev_time = None;
 
+    // This callback gets passed to our stream
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, time, .. }| {
         dsp::sample::buffer::equilibrium(buffer);
         let settings = Settings::new(SAMPLE_HZ as u32, frames as u16, CHANNELS as u16);
@@ -60,6 +67,7 @@ fn run() -> Result<(), pa::Error> {
             timer += dt;
             prev_time = Some(time.current);
 
+            // Break if we've exceeded the desired note duration
             if timer > note_duration {
                 if !is_note_off {
                     synth.note_off(note);
@@ -72,11 +80,13 @@ fn run() -> Result<(), pa::Error> {
         }
     };
 
+    // Set up PortAudio and the stream
     let pa = try!(pa::PortAudio::new());
     let settings = try!(pa.default_output_stream_settings::<f32>(CHANNELS, SAMPLE_HZ, FRAMES));
     let mut stream = try!(pa.open_non_blocking_stream(settings, callback));
     try!(stream.start());
 
+    // Loop while the stream is active
     while let Ok(true) = stream.is_active() {}
 
     Ok(())
