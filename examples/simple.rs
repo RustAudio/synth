@@ -29,10 +29,10 @@ fn run() -> Result<(), pa::Error> {
     let mut synth = {
         use synth::{Synth, mode};
 
-        // Create an oscillator tuned to C1 (32.70 Hz)
+        // Create an oscillator tuned to C1
         let waveform = synth::oscillator::waveform::Sine;
         let amp = 1.0;
-        let hz = 32.70;
+        let hz = LetterOctave(Letter::C, 1).hz() as f64;
         let freq_warp = ();
         let oscillator = synth::Oscillator::new(waveform, amp, hz, freq_warp);
 
