@@ -27,16 +27,17 @@ fn run() -> Result<(), pa::Error> {
     // Construct the simplest possible synth --
     // a single voice containing a sine wave oscillating at 440 Hz.
     let mut synth = {
-        use synth::dynamic::{Oscillator, Waveform, Amplitude, Frequency, FreqWarp};
+        use synth::{Synth, mode};
 
-        // Create our oscillator at A440
-        let oscillator = Oscillator::new(Waveform::Sine,
-            Amplitude::Constant(1.0),
-            Frequency::Hz(440.0),
-            FreqWarp::None);
+        // Create an oscillator tuned to C1 (32.70 Hz)
+        let waveform = synth::oscillator::waveform::Sine;
+        let amp = 1.0;
+        let hz = 32.70;
+        let freq_warp = ();
+        let oscillator = synth::Oscillator::new(waveform, amp, hz, freq_warp);
 
-        // Set up our synth using the oscillator and a single voice
-        synth::dynamic::new()
+        // Set up our synth using the oscillator and a single voice, based at C1
+        Synth::new(mode::Mono::retrigger(), ())
             .oscillator(oscillator)
             .duration(6000.0)
             .base_pitch(LetterOctave(Letter::C, 1).hz())
@@ -45,8 +46,8 @@ fn run() -> Result<(), pa::Error> {
             .volume(0.20)
     };
 
-    // Trigger the synth at its base pitch
-    let note = LetterOctave(Letter::C, 1);
+    // Trigger the synth at A4 (440 Hz)
+    let note = LetterOctave(Letter::A, 4);
     let note_velocity = 1.0;
     synth.note_on(note, note_velocity);
 
