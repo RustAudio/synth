@@ -18,7 +18,7 @@ pub mod freq_warp;
 
 
 /// The fundamental component of a synthesizer.
-#[derive(Debug, Clone, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Oscillator<W, A, F, FW> {
     /// Waveform used for phase movement.
     pub waveform: W,
@@ -33,7 +33,7 @@ pub struct Oscillator<W, A, F, FW> {
 }
 
 /// The state of an Oscillator that is unique to each voice playing it.
-#[derive(Copy, Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct State {
     /// The Oscillator's current phase.
     pub phase: f64,
@@ -42,7 +42,7 @@ pub struct State {
 }
 
 /// The state of each oscillator per-voice.
-#[derive(Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StatePerVoice(pub Vec<State>);
 
 

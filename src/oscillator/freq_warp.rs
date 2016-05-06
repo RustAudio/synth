@@ -1,4 +1,3 @@
-
 use pitch;
 use super::waveform::{self, Waveform};
 

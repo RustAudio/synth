@@ -1,11 +1,10 @@
-
-use envelope_lib as env;
+use envelope_lib;
 pub use envelope_lib::Envelope as Trait;
 use std::iter::FromIterator;
 
 
 /// An alias to the type of point to be used for amp and freq interpolation.
-pub type Point = env::BezierPoint<f64, f64>;
+pub type Point = envelope_lib::BezierPoint<f64, f64>;
 
 /// An alias for the envelope to be used used for amp and freq interpolation.
 #[derive(Clone, Debug, PartialEq)]

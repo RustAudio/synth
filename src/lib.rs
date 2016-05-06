@@ -2,7 +2,7 @@
 
 extern crate envelope as envelope_lib;
 extern crate gaussian;
-extern crate instrument as instrument_lib;
+pub extern crate instrument;
 extern crate panning;
 extern crate pitch_calc as pitch;
 extern crate time_calc as time;
@@ -10,8 +10,6 @@ extern crate rand;
 extern crate rustc_serialize;
 extern crate sample;
 extern crate utils;
-
-pub use instrument_lib as instrument;
 
 pub use dynamic::Synth as Dynamic;
 pub use envelope::{Envelope, Point};
