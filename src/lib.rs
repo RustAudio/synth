@@ -7,7 +7,6 @@ extern crate panning;
 extern crate pitch_calc as pitch;
 extern crate time_calc as time;
 extern crate rand;
-extern crate rustc_serialize;
 extern crate sample;
 extern crate utils;
 
