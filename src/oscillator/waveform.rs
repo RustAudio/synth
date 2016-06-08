@@ -103,7 +103,6 @@ impl Waveform for Square {
     #[inline]
     fn amp_at_phase(&self, phase: f64) -> f32 {
         (if ::utils::fmod(phase, 1.0) < 0.5 { -1.0 } else { 1.0 }) as f32
-        //(if (PI_2 * phase).sin() < 0.0 { -1.0 } else { 1.0 }) as f32
     }
 }
 
