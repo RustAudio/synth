@@ -10,18 +10,16 @@ repository = "https://github.com/RustAudio/synth.git"
 homepage = "https://github.com/RustAudio/synth"
 
 [dependencies]
-# envelope = "0.7.0"
-envelope = { path = "../envelope" }
-instrument = { path = "../instrument" }
-mindtree_utils = "0.3.0"
+envelope = "0.8.0"
+instrument = "0.1.0"
+mindtree_utils = "0.4.0"
 panning = "0.1.1"
-pitch_calc = "0.9.7"
+pitch_calc = "0.11.0"
 rand = "0.3.14"
-rustc-serialize = "0.3.16"
-sample = "0.3.0"
+sample = "0.6.0"
 simple_gaussian = "0.4.4"
-time_calc = "0.10.0"
-dsp-chain = { optional = true, version = "0.12.0" }
+time_calc = "0.11.0"
+dsp-chain = { optional = true, version = "0.13.0" }
 serde = { optional = true, version = "0.7.0" }
 serde_json = { optional = true, version = "0.7.0" }
 
