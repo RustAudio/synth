@@ -71,41 +71,23 @@ impl<W, A, F, FW> Oscillator<W, A, F, FW> {
 
     /// Waveform builder method.
     #[inline]
-    pub fn waveform<WNew>(self, waveform: WNew) -> Oscillator<WNew, A, F, FW> {
-        let Oscillator { amplitude, frequency, freq_warp, is_muted, .. } = self;
-        Oscillator {
-            waveform: waveform,
-            amplitude: amplitude, 
-            frequency: frequency,
-            freq_warp: freq_warp,
-            is_muted: is_muted,
-        }
+    pub fn waveform(mut self, waveform: W) -> Self {
+        self.waveform = waveform;
+        self
     }
 
     /// Amplitude envelope builder method.
     #[inline]
-    pub fn amplitude<ANew>(self, amplitude: ANew) -> Oscillator<W, ANew, F, FW> {
-        let Oscillator { waveform, frequency, freq_warp, is_muted, .. } = self;
-        Oscillator {
-            waveform: waveform,
-            amplitude: amplitude, 
-            frequency: frequency,
-            freq_warp: freq_warp,
-            is_muted: is_muted,
-        }
+    pub fn amplitude(mut self, amplitude: A) -> Self {
+        self.amplitude = amplitude;
+        self
     }
 
     /// Amplitude envelope builder method.
     #[inline]
-    pub fn frequency<FNew>(self, frequency: FNew) -> Oscillator<W, A, FNew, FW> {
-        let Oscillator { waveform, amplitude, freq_warp, is_muted, .. } = self;
-        Oscillator {
-            waveform: waveform,
-            amplitude: amplitude, 
-            frequency: frequency,
-            freq_warp: freq_warp,
-            is_muted: is_muted,
-        }
+    pub fn frequency(mut self, frequency: F) -> Self {
+        self.frequency = frequency;
+        self
     }
 
     /// Calculate and return the amplitude at the given ratio.
