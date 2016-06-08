@@ -331,18 +331,6 @@ impl<M, NFG, W, A, F, FW> Synth<M, NFG, W, A, F, FW>
         self.instrument.note_off(note_hz.into().hz());
     }
 
-    /// Pause playback.
-    #[inline]
-    pub fn pause(&mut self) {
-        self.instrument.pause();
-    }
-
-    /// Unpause playback.
-    #[inline]
-    pub fn unpause(&mut self) {
-        self.instrument.unpause();
-    }
-
     /// Stop playback and clear the current notes.
     #[inline]
     pub fn stop(&mut self)
