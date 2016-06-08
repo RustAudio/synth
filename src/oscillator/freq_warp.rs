@@ -81,18 +81,16 @@ impl FreqWarp for Dynamic {
     #[inline]
     fn step_phase(&self, sample_hz: f64, freq_warp_phase: &mut f64) {
         match *self {
-            Dynamic::None                        |
-            Dynamic::Gaussian(_)                 => (),
+            Dynamic::None | Dynamic::Gaussian(_) => (),
             Dynamic::PitchDrift(ref pitch_drift) => pitch_drift.step_phase(sample_hz, freq_warp_phase),
         }
     }
     #[inline]
     fn warp_hz(&self, hz: f64, freq_warp_phase: f64) -> f64 {
         match *self {
-            Dynamic::None                        => hz,
-            Dynamic::Gaussian(ref gaussian)      => gaussian.warp_hz(hz, freq_warp_phase),
+            Dynamic::None => hz,
+            Dynamic::Gaussian(ref gaussian) => gaussian.warp_hz(hz, freq_warp_phase),
             Dynamic::PitchDrift(ref pitch_drift) => pitch_drift.warp_hz(hz, freq_warp_phase),
         }
     }
 }
-
