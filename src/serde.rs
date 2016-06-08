@@ -93,7 +93,7 @@ mod envelope {
                 }
             }
 
-            static FIELDS: &'static [&'static str] = &["hz", "amp"];
+            static FIELDS: &'static [&'static str] = &["points"];
 
             deserializer.deserialize_struct("Envelope", FIELDS, Visitor)
         }
@@ -1535,7 +1535,7 @@ mod voice {
                 }
             }
 
-            static FIELDS: &'static [&'static str] = &["hz", "amp"];
+            static FIELDS: &'static [&'static str] = &["loop_playhead", "oscillator_states"];
 
             deserializer.deserialize_struct("Voice", FIELDS, Visitor)
         }
@@ -1850,4 +1850,21 @@ mod synth {
         assert_eq!(synth, deserialized);
     }
 
+}
+
+#[test]
+fn test_dynamic_synth() {
+    use dynamic::Synth;
+
+    extern crate serde_json;
+
+    let synth = Synth::dynamic_retrigger();
+    let serialized = serde_json::to_string(&synth).unwrap();
+
+    println!("{}", serialized);
+    
+    let deserialized: Synth = serde_json::from_str(&serialized).unwrap();
+
+    println!("{:?}", deserialized);
+    assert_eq!(synth, deserialized);
 }
