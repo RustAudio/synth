@@ -92,9 +92,9 @@ impl<W, A, F, FW> Oscillator<W, A, F, FW> {
 
     /// Calculate and return the amplitude at the given ratio.
     #[inline]
-    pub fn amp_at(&self, phase: f64, playhead_perc: f64) -> f32 where
-        A: Amplitude,
-        W: Waveform,
+    pub fn amp_at(&self, phase: f64, playhead_perc: f64) -> f32
+        where A: Amplitude,
+              W: Waveform,
     {
         self.waveform.amp_at_phase(phase) * self.amplitude.amp_at_playhead(playhead_perc)
     }

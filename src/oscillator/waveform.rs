@@ -11,7 +11,6 @@ pub trait Waveform {
     fn process_hz(&self, hz: f64) -> f64 { hz }
 }
 
-
 /// Twice PI.
 const PI_2: f64 = ::std::f64::consts::PI * 2.0;
 
@@ -125,4 +124,3 @@ impl Waveform for NoiseWalk {
         pitch::ScaledPerc(perc, 0.6).hz() as f64
     }
 }
-

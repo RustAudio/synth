@@ -49,4 +49,3 @@ impl Amplitude for Dynamic {
         }
     }
 }
-
