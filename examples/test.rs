@@ -10,12 +10,13 @@ extern crate dsp;
 extern crate pitch_calc as pitch;
 extern crate portaudio;
 extern crate synth;
-extern crate time_calc as time;
+extern crate time_calc as timec;
 
 use dsp::{Node, Settings};
 use portaudio as pa;
 use pitch::{Letter, LetterOctave};
 use synth::Synth;
+use std::{thread, time};
 
 // Currently supports i8, i32, f32.
 pub type AudioSample = f32;
@@ -129,8 +130,10 @@ fn run() -> Result<(), pa::Error> {
     let mut stream = try!(pa.open_non_blocking_stream(settings, callback));
     try!(stream.start());
 
+    let ten_millis = time::Duration::from_millis(10);
+
     // Loop while the stream is active.
-    while let Ok(true) = stream.is_active() {}
+    while let Ok(true) = stream.is_active() { thread::sleep(ten_millis); }
 
     Ok(())
 }
