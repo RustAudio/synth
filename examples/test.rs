@@ -10,7 +10,6 @@ extern crate dsp;
 extern crate pitch_calc as pitch;
 extern crate portaudio;
 extern crate synth;
-extern crate time_calc as timec;
 
 use dsp::{Node, Settings};
 use portaudio as pa;
