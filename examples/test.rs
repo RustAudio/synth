@@ -128,8 +128,6 @@ fn run() -> Result<(), pa::Error> {
     let mut stream = try!(pa.open_non_blocking_stream(settings, callback));
     try!(stream.start());
 
-    let ten_millis = std::time::Duration::from_millis(10);
-
     // Loop while the stream is active.
     while let Ok(true) = stream.is_active() {
         std::thread::sleep(std::time::Duration::from_millis(16));
