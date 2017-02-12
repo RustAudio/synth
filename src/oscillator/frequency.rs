@@ -1,4 +1,3 @@
-
 use envelope;
 use pitch;
 
@@ -19,7 +18,7 @@ pub trait Frequency {
 pub type Envelope = envelope::Envelope;
 
 /// A type that allows dynamically switching between constant and enveloped frequency.
-#[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Dynamic {
     Envelope(Envelope),
     Hz(f64),
@@ -88,4 +87,3 @@ impl Frequency for Dynamic {
         }
     }
 }
-

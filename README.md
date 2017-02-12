@@ -20,7 +20,7 @@ Features
 - Warbliness Oscillator builder method that uses gaussian noise to model the "warped-old-hardware-synth" sound.
 
 ```Rust
-synth.audio_requested(buffer, SETTINGS),
+synth.fill_slice(frame_slice, sample_hz),
 ```
 
 See an example [here](https://github.com/RustAudio/synth/blob/master/examples/test.rs).

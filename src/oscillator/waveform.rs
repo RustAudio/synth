@@ -11,7 +11,6 @@ pub trait Waveform {
     fn process_hz(&self, hz: f64) -> f64 { hz }
 }
 
-
 /// Twice PI.
 const PI_2: f64 = ::std::f64::consts::PI * 2.0;
 
@@ -20,7 +19,7 @@ pub type Steepness = f32;
 
 /// An Oscillator must use one of a variety
 /// of waveform types.
-#[derive(Copy, Clone, Debug, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Dynamic {
     /// Sine Wave
     Sine,
@@ -37,27 +36,27 @@ pub enum Dynamic {
 }
 
 /// A sine wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sine;
 
 /// A sawtooth wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Saw;
 
 /// An exponential sawtooth wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct SawExp(pub Steepness);
 
 /// A square wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Square;
 
 /// A noise signal.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Noise;
 
 /// A random noise walk wave.
-#[derive(Copy, Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct NoiseWalk;
 
 
@@ -103,7 +102,6 @@ impl Waveform for Square {
     #[inline]
     fn amp_at_phase(&self, phase: f64) -> f32 {
         (if ::utils::fmod(phase, 1.0) < 0.5 { -1.0 } else { 1.0 }) as f32
-        //(if (PI_2 * phase).sin() < 0.0 { -1.0 } else { 1.0 }) as f32
     }
 }
 
@@ -126,4 +124,3 @@ impl Waveform for NoiseWalk {
         pitch::ScaledPerc(perc, 0.6).hz() as f64
     }
 }
-

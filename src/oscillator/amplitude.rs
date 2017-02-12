@@ -1,4 +1,3 @@
-
 use envelope;
 use envelope::Trait as EnvelopeTrait;
 
@@ -14,7 +13,7 @@ pub trait Amplitude {
 pub type Envelope = envelope::Envelope;
 
 /// A type that allows dynamically switching between constant and enveloped amplitude.
-#[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Dynamic {
     Envelope(Envelope),
     Constant(f32),
@@ -50,4 +49,3 @@ impl Amplitude for Dynamic {
         }
     }
 }
-
