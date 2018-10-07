@@ -14,7 +14,7 @@ pub use dynamic::Synth as Dynamic;
 pub use envelope::{Envelope, Point};
 pub use envelope::Trait as EnvelopeTrait;
 pub use oscillator::{AmpEnvelope, FreqEnvelope, Oscillator, Waveform};
-pub use synth::Synth;
+pub use synth::{Synth, Frames};
 
 pub mod dynamic;
 pub mod envelope;
